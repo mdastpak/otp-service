@@ -26,7 +26,7 @@ Generate a one-time password (OTP) with configurable parameters like TTL, retry 
   - Default: **60** seconds.
 - `retry_limit` (int): Number of allowed retries for OTP verification.
   - Valid Range: **1-10**.
-  - Default: **5** characters.
+  - Default: **5** retries.
 - `use_alpha_numeric` (bool): Whether to generate an alphanumeric OTP.
   - Accepted values: **true/false or 1/0**.
   - Default: **false**.
