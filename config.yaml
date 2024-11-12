@@ -1,11 +1,11 @@
 REDIS:
-  HOST: "LOCALHOST"
+  HOST: "localhost"
   PORT: "6379"
   PASSWORD: ""
   INDICES: "0"
 
 SERVER:
-  HOST: "LOCALHOST"
+  HOST: "localhost"
   PORT: "8080"
 
 CONFIG:

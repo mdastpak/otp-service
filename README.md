@@ -1,72 +1,244 @@
-# OTP Generation and Verification System
 
-This is a Go-based OTP (One-Time Password) generation and verification system that uses Redis as the backend for storing OTPs. The system supports both numeric and alphanumeric OTPs, with configurable TTL (time-to-live), retry limits, and validation modes.
+# OTP Service API Documentation
 
-## Features
+This README provides details on the API endpoints, input parameters, expected request/response bodies, and status codes for the OTP (One-Time Password) service.
 
-- Generate and validate OTP codes.
-- Configurable TTL and retry limits.
-- Support for numeric and alphanumeric OTP codes.
-- Supports strict body validation during OTP verification.
-- Redis is used for fast and reliable storage of OTP data.
+## Table of Contents
+
+- [Endpoints](#endpoints)
+  - [Generate OTP](#generate-otp)
+  - [Verify OTP](#verify-otp)
+  - [Health Check](#health-check)
+- [Request Parameters](#request-parameters)
+- [Response Structure](#response-structure)
+- [Status Code Guide](#status-code-guide)
 
 ## Endpoints
 
-### 1. Generate OTP (`POST /otp`)
+### Generate OTP
 
-Generate a one-time password (OTP) with configurable parameters like TTL, retry limits, and code complexity.
+**URL**: `/`
 
-**Query Parameters, Defaults, and Valid Ranges:**
+**Method**: `POST`
 
-- `strict_validation` (bool): Whether to enable strict validation of request bodies during OTP verification.
-  - Accepted values: **true/false or 1/0**.
-  - Default: **false**.
-- `ttl` (int): Time-to-live for the OTP, in seconds.
-  - Valid range: **1 to 3600**.
-  - Default: **60** seconds.
-- `retry_limit` (int): Number of allowed retries for OTP verification.
-  - Valid Range: **1-10**.
-  - Default: **5** retries.
-- `use_alpha_numeric` (bool): Whether to generate an alphanumeric OTP.
-  - Accepted values: **true/false or 1/0**.
-  - Default: **false**.
-- `code_length` (int): Length of the OTP code.
-  - Valid Range: **1-10**.
-  - Default: **6** characters.
+**Description**: Generates a one-time password (OTP) and stores it in Redis. The OTP is uniquely associated with a UUID that will be returned in the response.
 
-**Request Example (cURL):**
+#### Request Parameters
+
+The following parameters can be sent via query string or in the request body as JSON.
+
+- `ttl` (optional, default: `60`): The time-to-live of the OTP in seconds. Must be between `1` and `3600`.
+- `retry_limit` (optional, default: `5`): The maximum number of times the OTP can be retried. Must be between `1` and `60`.
+- `code_length` (optional, default: `6`): The length of the OTP code. Must be between `1` and `10`.
+- `strict_validation` (optional, default: `false`): If set to `true`, the service will enforce strict validation of the request body during verification.
+- `use_alpha_numeric` (optional, default: `false`): If set to `true`, the OTP will contain letters and numbers; otherwise, only numbers.
+
+#### Example Request
 
 ```bash
-curl --silent --location --request POST '127.0.0.1:8080/otp?strict_validation=false&ttl=60&retry_limit=5&use_alpha_numeric=false&code_length=6' \
---header 'Content-Type: application/json' \
+curl -X POST "http://localhost:8080" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "ttl": 120,
+    "retry_limit": 3,
+    "code_length": 8,
+    "strict_validation": true,
+    "use_alpha_numeric": true
+  }'
+```
+
+#### Example Response
+
+```json
+{
+  "status": 200,
+  "message": "OTP_GENERATED",
+  "info": {
+    "uuid": "1c11604d-47fa-442a-866a-231686e14a8b"
+  }
+}
+```
+
+### Verify OTP
+
+**URL**: `/:uuid/:otp`
+
+**Method**: `GET`
+
+**Description**: Verifies an OTP based on the UUID and OTP value provided.
+
+#### Path Parameters
+
+- `uuid` (required): The UUID associated with the OTP that was generated.
+- `otp` (required): The OTP value to be verified.
+
+#### Example Request
+
+```bash
+curl -X GET "http://localhost:8080/1c11604d-47fa-442a-866a-231686e14a8b/447317"
+```
+
+#### Example Response
+
+If the OTP is verified successfully:
+
+```json
+{
+  "status": 200,
+  "message": "OTP_VERIFIED"
+}
+```
+
+If the OTP is invalid or expired:
+
+```json
+{
+  "status": 401,
+  "message": "OTP_INVALID"
+}
+```
+
+### Health Check
+
+**URL**: `/health`
+
+**Method**: `GET`
+
+**Description**: Checks the health status of the service, including Redis connectivity.
+
+#### Example Request
+
+```bash
+curl -X GET "http://localhost:8080/health"
+```
+
+#### Example Response
+
+```json
+{
+  "status": 200,
+  "message": "SERVICE_HEALTH",
+  "info": {
+    "redis_status": "OK"
+  }
+}
+```
+
+## Request Parameters
+
+The OTP service supports passing parameters via either the query string or request body (in JSON format). The following parameters can be used:
+
+- `ttl`: Time-to-live for OTP in seconds.
+- `retry_limit`: Maximum retries allowed.
+- `code_length`: Length of the generated OTP.
+- `strict_validation`: Enforce strict validation of the request body during verification.
+- `use_alpha_numeric`: If the OTP should contain both letters and numbers.
+
+## Response Structure
+
+All API responses use the following standard structure:
+
+```json
+{
+  "status": <int>,
+  "message": "<string>",
+  "info": <object>
+}
+```
+
+- `status`: HTTP status code (e.g., `200` for success).
+- `message`: Response message indicating the status (e.g., `OTP_GENERATED`, `OTP_VERIFIED`, etc.).
+- `info`: Additional information related to the response (e.g., UUID for generated OTP).
+
+## Status Code Guide
+
+Below is a guide for various status codes and their meanings:
+
+| Status Code | Message                  | Description                                          |
+| ----------- | ------------------------ | ---------------------------------------------------- |
+| `200`     | `OTP_GENERATED`        | OTP was successfully generated.                      |
+| `200`     | `OTP_VERIFIED`         | OTP was successfully verified.                       |
+| `400`     | `REQUEST_BODY_INVALID` | The request body is invalid or improperly formatted. |
+| `400`     | `JSON_INVALID`         | The JSON structure is invalid.                       |
+| `400`     | `TTL_INVALID`          | The `ttl` parameter is out of range.               |
+| `400`     | `RETRY_INVALID`        | The `retry_limit` parameter is out of range.       |
+| `400`     | `CODE_INVALID`         | The `code_length` parameter is out of range.       |
+| `400`     | `OTP_MISSING`          | Required UUID or OTP is missing from request.        |
+| `401`     | `OTP_INVALID`          | The provided OTP is incorrect.                       |
+| `401`     | `OTP_EXPIRED`          | The OTP has expired.                                 |
+| `401`     | `OTP_ATTEMPTS`         | The OTP retry limit has been reached.                |
+| `401`     | `REQUEST_MISMATCH`     | The request body does not match the expected data.   |
+| `500`     | `SERVICE_HEALTH`       | Health check of the service, including Redis status. |
+
+## Additional Notes
+
+- Ensure Redis is running and configured properly for the OTP service to work.
+- The `strict_validation` parameter helps ensure the request data matches what was used during OTP generation, adding an extra layer of security.
+- The `retry_limit` parameter limits the number of incorrect attempts a user can make, providing basic protection against brute-force attacks.
+
+### Examples of Requests with Strict Validation
+
+Below are examples of requests that demonstrate the use of the `strict_validation` parameter.
+
+#### Example 1: Generate OTP with Strict Validation Disabled
+
+```bash
+curl --silent --location --request POST 'localhost:8080/' \
+--data '{}'
+```
+
+#### Example 2: Generate OTP with Strict Validation Disabled (Custom Parameters)
+
+```bash
+curl --silent --location --request POST 'localhost:8080/?ttl=120&retry_limit=10&code_length=10&strict_validation=false&use_alpha_numeric=true' \
+--data '{}'
+```
+
+#### Example 3: Generate OTP with Strict Validation Enabled
+
+```bash
+curl --silent --location --request POST 'localhost:8080/?ttl=60&retry_limit=5&code_length=6&strict_validation=true&use_alpha_numeric=false' \
 --data '{
-    "Hi": "Welcome",
-    "key": {
-        "value":"1",
-        "value2": "2"
+    "lowecase tag": "Value",
+    "UPPERCASE TAG": "VALUE",
+    "MULTIcase TaG": "VaLuE",
+    "Keys": {
+        "Key 1": "Val 1",
+        "Key 2": "Val 2",
+        "Key 3": {
+            "SubKey3-1": "Val 3-1",
+            "SubKey3-2": "Val 3-2"
+        }
     }
 }'
 ```
 
-### 2. Verify OTP (`GET /otp`)
-
-Verify the OTP code provided by the user and optionally perform strict validation of the request body.
-
-**Query Parameters:**
-
-- `uuid` (string): The unique identifier for the OTP request.
-- `otp` (string): The OTP code to verify.
-
-**Request Example (cURL):**
+#### Example 4: Verify OTP with No Strict Validation
 
 ```bash
-curl --silent --location --request GET '127.0.0.1:8080/verify?uuid=1c9db35c-0078-4c85-bb9a-f67cf8db9564&otp=440757' \
+curl --silent --location --request GET 'localhost:8080/e63ee3c4-9ebe-42a3-8c2a-e05e88c468a4/174464' \
+--header 'Content-Type: application/json' \
+--data '{}'
+```
+
+#### Example 5: Verify OTP with Strict Validation Enabled
+
+```bash
+curl --silent --location --request GET 'localhost:8080/f49c8bb4-e88e-453e-a878-b69c42c0a32a/720041' \
 --header 'Content-Type: application/json' \
 --data '{
-    "Hi": "Welcome",
-    "key": {
-        "value":"4",
-        "value2": "2"
+    "lowecase tag": "Value",
+    "UPPERCASE TAG": "VALUE",
+    "MULTIcase TaG": "VaLuE",
+    "Keys": {
+        "Key 1": "Val 1",
+        "Key 2": "Val 2",
+        "Key 3": {
+            "SubKey3-1": "Val 3-1",
+            "SubKey3-2": "Val 3-2"
+        }
     }
 }'
 ```
+
+If you have any questions or issues, feel free to reach out for support.
