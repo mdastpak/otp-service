@@ -12,6 +12,7 @@ This README provides details on the API endpoints, input parameters, expected re
 - [Request Parameters](#request-parameters)
 - [Response Structure](#response-structure)
 - [Status Code Guide](#status-code-guide)
+- [Configuration Indices](#configuration-indices)
 
 ## Endpoints
 
@@ -240,5 +241,21 @@ curl --silent --location --request GET 'localhost:8080/f49c8bb4-e88e-453e-a878-b
     }
 }'
 ```
+
+## Configuration Indices
+
+The OTP service utilizes multiple Redis indices for storing OTPs, as specified in the configuration file (`config.yaml`). The `REDIS.INDICES` configuration allows you to determine how many Redis databases are used to distribute OTPs.
+
+- **Single Index**: You can specify a single Redis index (e.g., `0`) to store all OTPs in a single Redis database.
+- **Range of Indices**: You can specify a range of Redis indices (e.g., `0-3`). In this scenario, OTPs will be distributed among the specified Redis databases using a round-robin algorithm, which helps to balance the load.
+
+The `REDIS.INDICES` configuration is crucial for scaling the OTP service effectively, especially under high load. By distributing the OTPs across multiple Redis databases, the service can handle more concurrent requests and reduce contention for Redis resources.
+
+### Additional Configuration Parameters
+
+The OTP service also provides additional configuration parameters that can be adjusted in the `CONFIG` section of the configuration file.
+
+- **`HASH_REDIS_KEY`**: If set to `true`, the Redis keys used to store OTPs are hashed using SHA-256. This helps to prevent any potential key collisions and makes the keys more secure. It is recommended to keep this value as `true` for production environments.
+- **`REDIS_KEY_PREFIX`**: This parameter allows you to set a prefix for all Redis keys used by the service. This can be useful for namespacing keys, especially if you are using a shared Redis instance for multiple services. If left empty (`""`), no prefix will be added. Example: if the prefix is set to `"OTP"`, all keys will be stored as `"OTP:<key>"`.
 
 If you have any questions or issues, feel free to reach out for support.
