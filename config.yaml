@@ -3,12 +3,12 @@ REDIS:
   PORT: "6379"
   PASSWORD: ""
   INDICES: "0"
+  KEY_PREFIX: "" #CAN BE EMPTY
 
 SERVER:
   HOST: "localhost"
   PORT: "8080"
 
 CONFIG:
-  HASH_REDIS_KEY: true
-  REDIS_KEY_PREFIX: "" #CAN BE EMPTY
+  HASH_KEYS: true
 

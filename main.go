@@ -32,18 +32,18 @@ var (
 // Config structure to hold server, redis, and general configurations
 type Config struct {
 	Redis struct {
-		Host     string `mapstructure:"HOST"`
-		Port     string `mapstructure:"PORT"`
-		Password string `mapstructure:"PASSWORD"`
-		Indices  string `mapstructure:"INDICES"`
+		Host      string `mapstructure:"HOST"`
+		Port      string `mapstructure:"PORT"`
+		Password  string `mapstructure:"PASSWORD"`
+		Indices   string `mapstructure:"INDICES"`
+		KeyPrefix string `mapstructure:"KEY_PREFIX"`
 	} `mapstructure:"REDIS"`
 	Server struct {
 		Host string `mapstructure:"HOST"`
 		Port string `mapstructure:"PORT"`
 	} `mapstructure:"SERVER"`
 	Config struct {
-		HashRedisKey   bool   `mapstructure:"HASH_REDIS_KEY"`
-		RedisKeyPrefix string `mapstructure:"REDIS_KEY_PREFIX"`
+		HashKeys bool `mapstructure:"HASH_KEYS"`
 	} `mapstructure:"CONFIG"`
 }
 
@@ -52,12 +52,24 @@ func init() {
 	logger.SetFormatter(&logrus.JSONFormatter{})
 	logger.SetLevel(logrus.InfoLevel)
 
-	// Load configuration using viper
-	viper.SetConfigFile("config.yaml")
+	// Read configuration from file
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(".")
+
 	if err := viper.ReadInConfig(); err != nil {
 		logger.Fatalf("Error reading config file: %v", err)
 	}
 	viper.AutomaticEnv()
+
+	// Bind environment variables to specific keys in the config
+	viper.BindEnv("REDIS.HOST", "REDIS_HOST")
+	viper.BindEnv("REDIS.PORT", "REDIS_PORT")
+	viper.BindEnv("REDIS.PASSWORD", "REDIS_PASSWORD")
+	viper.BindEnv("REDIS.KEY_PREFIX", "REDIS_KEY_PREFIX")
+	viper.BindEnv("SERVER.HOST", "SERVER_HOST")
+	viper.BindEnv("SERVER.PORT", "SERVER_PORT")
+	viper.BindEnv("CONFIG.HASH_KEYS", "HASH_KEYS")
 
 	// Unmarshal configuration into Config struct
 	if err := viper.Unmarshal(&config); err != nil {
@@ -66,7 +78,7 @@ func init() {
 
 	// Initialize Redis clients based on configuration
 	if config.Redis.Indices == "" {
-		logger.Fatal("REDIS.INDICES configuration is missing")
+		config.Redis.Indices = ""
 	}
 
 	indexList := parseRedisIndices(config.Redis.Indices)
@@ -162,32 +174,32 @@ func generateOTP(codeLength int, useAlphaNumeric bool) (string, error) {
 }
 
 // Save OTP data to Redis using round-robin algorithm
-func saveOTPToRedis(requestUUID string, otpData OTPRequest) {
-	go func() {
-		otpJSON, err := json.Marshal(otpData)
-		if err != nil {
-			logger.Errorf("Error marshaling OTP data: %v", err)
-			return
-		}
-		ttl := time.Until(otpData.ExpirationTime)
-		key := requestUUID
-		if config.Config.HashRedisKey {
-			key = generateRedisKey(requestUUID)
-		}
+func saveOTPToRedis(requestUUID string, otpData OTPRequest) error {
+	otpJSON, err := json.Marshal(otpData)
+	if err != nil {
+		logger.Errorf("Error marshaling OTP data: %v", err)
+		return err
+	}
+	ttl := time.Until(otpData.ExpirationTime)
+	key := requestUUID
+	if config.Config.HashKeys {
+		key = generateRedisKey(requestUUID)
+	}
 
-		clientIndex := rrCounter % len(rbClients)
-		client := rbClients[clientIndex]
-		otpData.RedisIndex = clientIndex
+	clientIndex := rrCounter % len(rbClients)
+	client := rbClients[clientIndex]
+	otpData.RedisIndex = clientIndex
 
-		if config.Config.RedisKeyPrefix != "" {
-			key = fmt.Sprintf("%s:%s", config.Config.RedisKeyPrefix, key)
-		}
+	if config.Redis.KeyPrefix != "" {
+		key = fmt.Sprintf("%s:%s", config.Redis.KeyPrefix, key)
+	}
 
-		if err := client.Set(ctx, key, otpJSON, ttl).Err(); err != nil {
-			logger.Errorf("Error saving OTP to Redis: %v", err)
-		}
-		rrCounter++
-	}()
+	if err := client.Set(ctx, key, otpJSON, ttl).Err(); err != nil {
+		logger.Errorf("Error saving OTP to Redis: %v", err)
+		return err
+	}
+	rrCounter++
+	return nil
 }
 
 // Generate a Redis key using a hash-based structure (SHA-256)
@@ -250,14 +262,17 @@ func generateOTPHandler(c *gin.Context) {
 
 	// Generate OTP
 	if otpRequest.OTP, err = generateOTP(otpRequest.CodeLength, otpRequest.UseAlphaNumeric); err != nil {
-		sendAPIResponse(c, http.StatusInternalServerError, "OTP_INVALID", nil)
+		sendAPIResponse(c, http.StatusInternalServerError, "OTP_GENERATION_FAILED", nil)
 		return
 	}
 	otpRequest.ExpirationTime = time.Now().Add(time.Duration(otpRequest.TTL) * time.Second)
 
 	// Generate UUID and save OTP to Redis
 	requestUUID := uuid.New().String()
-	saveOTPToRedis(requestUUID, otpRequest)
+	if err := saveOTPToRedis(requestUUID, otpRequest); err != nil {
+		sendAPIResponse(c, http.StatusInternalServerError, "REDIS_UNAVAILABLE", nil)
+		return
+	}
 
 	// Send response with generated UUID
 	sendAPIResponse(c, http.StatusOK, "OTP_GENERATED", map[string]string{
@@ -278,7 +293,7 @@ func verifyOTPHandler(c *gin.Context) {
 
 	// Generate the Redis key
 	key := requestUUID
-	if config.Config.HashRedisKey {
+	if config.Config.HashKeys {
 		key = generateRedisKey(requestUUID)
 	}
 
@@ -287,13 +302,18 @@ func verifyOTPHandler(c *gin.Context) {
 	var client *redis.Client
 	for _, client = range rbClients {
 		storedData, err := client.Get(ctx, key).Result()
-		if err == nil {
-			if err := json.Unmarshal([]byte(storedData), &otpData); err != nil {
-				sendAPIResponse(c, http.StatusInternalServerError, "OTP_INVALID", nil)
-				return
-			}
-			break
+		if err == redis.Nil {
+			sendAPIResponse(c, http.StatusServiceUnavailable, "REDIS_UNAVAILABLE", nil)
+			return
+		} else if err != nil {
+			sendAPIResponse(c, http.StatusInternalServerError, "REDIS_ERROR", nil)
+			return
 		}
+		if err := json.Unmarshal([]byte(storedData), &otpData); err != nil {
+			sendAPIResponse(c, http.StatusInternalServerError, "OTP_INVALID", nil)
+			return
+		}
+		break
 	}
 
 	// Check if OTP is found
