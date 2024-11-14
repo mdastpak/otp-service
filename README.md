@@ -149,22 +149,21 @@ All API responses use the following standard structure:
 
 Below is a guide for various status codes and their meanings:
 
-| Status Code | Message                    | Description                                          |
-| ----------- | -------------------------- | ---------------------------------------------------- |
-| `200`     | `OTP_GENERATED`          | OTP was successfully generated.                      |
-| `200`     | `OTP_VERIFIED`           | OTP was successfully verified.                       |
-| `400`     | `REQUEST_BODY_INVALID`   | The request body is invalid or improperly formatted. |
-| `400`     | `TTL_INVALID`            | The `ttl` parameter is out of range.                 |
-| `400`     | `RETRY_INVALID`          | The `retry_limit` parameter is out of range.         |
-| `400`     | `CODE_LENGTH_INVALID`    | The `code_length` parameter is out of range.         |
-| `400`     | `OTP_MISSING`            | Required UUID or OTP is missing from request.        |
-| `401`, `500`     | `OTP_INVALID`           | The provided OTP is incorrect.                       |
-| `401`     | `OTP_EXPIRED`            | The OTP has expired.                                 |
-| `401`     | `OTP_ATTEMPTS`           | The OTP retry limit has been reached.                |
-| `401`     | `REQUEST_BODY_MISMATCH`  | The request body does not match the expected data.   |
-| `429`     | `RATE_LIMIT_EXCEEDED`    | Rate limit exceeded.                                 |
-| `200`, `500`     | `SERVICE_HEALTH`         | Health check of the service, including Redis status. |
-
+| Status Code      | Message                   | Description                                          |
+| ---------------- | ------------------------- | ---------------------------------------------------- |
+| `200`          | `OTP_GENERATED`         | OTP was successfully generated.                      |
+| `200`          | `OTP_VERIFIED`          | OTP was successfully verified.                       |
+| `400`          | `REQUEST_BODY_INVALID`  | The request body is invalid or improperly formatted. |
+| `400`          | `TTL_INVALID`           | The `ttl` parameter is out of range.               |
+| `400`          | `RETRY_INVALID`         | The `retry_limit` parameter is out of range.       |
+| `400`          | `CODE_LENGTH_INVALID`   | The `code_length` parameter is out of range.       |
+| `400`          | `OTP_MISSING`           | Required UUID or OTP is missing from request.        |
+| `401`, `500` | `OTP_INVALID`           | The provided OTP is incorrect.                       |
+| `401`          | `OTP_EXPIRED`           | The OTP has expired.                                 |
+| `401`          | `OTP_ATTEMPTS`          | The OTP retry limit has been reached.                |
+| `401`          | `REQUEST_BODY_MISMATCH` | The request body does not match the expected data.   |
+| `429`          | `RATE_LIMIT_EXCEEDED`   | Rate limit exceeded.                                 |
+| `200`, `500` | `SERVICE_HEALTH`        | Health check of the service, including Redis status. |
 
 ## Additional Notes
 
@@ -237,7 +236,7 @@ curl --silent --location --request GET 'localhost:8080/?uuid=e63ee3c4-9ebe-42a3-
 }'
 ```
 
-## Configuration Indices
+## Redis Configuration
 
 The OTP service utilizes multiple Redis indices for storing OTPs, as specified in the configuration file (`config.yaml`). The `REDIS.INDICES` configuration allows you to determine how many Redis databases are used to distribute OTPs.
 
@@ -255,6 +254,6 @@ The `REDIS.TIMEOUT` configuration allows you to set a timeout for Redis connecti
 The OTP service also provides additional configuration parameters that can be adjusted in the `CONFIG` section of the configuration file.
 
 - **`CONFIG.HASH_KEY`**: If set to `true`, the Redis keys used to store OTPs are hashed using SHA-256. This helps to prevent any potential key collisions and makes the keys more secure. It is recommended to keep this value as `true` for production environments.
-- **`SERVER.DEBUG`**: If set to `true`, the service will log additional debug information, which can be helpful for troubleshooting. It is recommended to keep this value as `true` for production environments.
+- **`SERVER.DEBUG`**: If set to `true`, the service will log additional debug information, which can be helpful for troubleshooting. It is recommended to keep this value as `false` for production environments.
 
 If you have any questions or issues, feel free to reach out for support.
