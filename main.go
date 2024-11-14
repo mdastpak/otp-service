@@ -552,12 +552,6 @@ func updateRetryLimitInRedis(uuid string, otpData *OTPRequest) error {
 
 // main function with graceful shutdown
 func main() {
-	// Load configuration
-	loadConfig()
-
-	// Initialize Redis with error handling
-	initRedis()
-
 	// Set up Gin router with CORS
 	if config.Server.Debug {
 		gin.SetMode(gin.DebugMode)
