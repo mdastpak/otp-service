@@ -10,8 +10,10 @@ services:
       - REDIS_PORT=6379
       - REDIS_PASSWORD=
       - REDIS_KEY_PREFIX=
+      - REDIS_TIMEOUT=5
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
+      - SERVER_DEBUG=false
       - HASH_KEYS=true
     depends_on:
       - redis

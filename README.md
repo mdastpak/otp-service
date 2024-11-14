@@ -1,4 +1,3 @@
-
 # OTP Service API Documentation
 
 This README provides details on the API endpoints, input parameters, expected request/response bodies, and status codes for the OTP (One-Time Password) service.
@@ -39,13 +38,7 @@ The following parameters can be sent via query string or in the request body as 
 ```bash
 curl -X POST "http://localhost:8080" \
   -H "Content-Type: application/json" \
-  -d '{
-    "ttl": 120,
-    "retry_limit": 3,
-    "code_length": 8,
-    "strict_validation": true,
-    "use_alpha_numeric": true
-  }'
+  -d '{ }'
 ```
 
 #### Example Response
@@ -62,13 +55,13 @@ curl -X POST "http://localhost:8080" \
 
 ### Verify OTP
 
-**URL**: `/:uuid/:otp`
+**URL**: `/`
 
 **Method**: `GET`
 
 **Description**: Verifies an OTP based on the UUID and OTP value provided.
 
-#### Path Parameters
+#### Request Parameters
 
 - `uuid` (required): The UUID associated with the OTP that was generated.
 - `otp` (required): The OTP value to be verified.
@@ -76,7 +69,7 @@ curl -X POST "http://localhost:8080" \
 #### Example Request
 
 ```bash
-curl -X GET "http://localhost:8080/1c11604d-47fa-442a-866a-231686e14a8b/447317"
+curl -X GET "http://localhost:8080/?uuid=1c11604d-47fa-442a-866a-231686e14a8b&otp=447317"
 ```
 
 #### Example Response
@@ -120,7 +113,8 @@ curl -X GET "http://localhost:8080/health"
   "status": 200,
   "message": "SERVICE_HEALTH",
   "info": {
-    "redis_status": "OK"
+    "redis_status": "OK",
+    "config": "***********",
   }
 }
 ```
@@ -155,21 +149,22 @@ All API responses use the following standard structure:
 
 Below is a guide for various status codes and their meanings:
 
-| Status Code | Message                  | Description                                          |
-| ----------- | ------------------------ | ---------------------------------------------------- |
-| `200`     | `OTP_GENERATED`        | OTP was successfully generated.                      |
-| `200`     | `OTP_VERIFIED`         | OTP was successfully verified.                       |
-| `400`     | `REQUEST_BODY_INVALID` | The request body is invalid or improperly formatted. |
-| `400`     | `JSON_INVALID`         | The JSON structure is invalid.                       |
-| `400`     | `TTL_INVALID`          | The `ttl` parameter is out of range.               |
-| `400`     | `RETRY_INVALID`        | The `retry_limit` parameter is out of range.       |
-| `400`     | `CODE_INVALID`         | The `code_length` parameter is out of range.       |
-| `400`     | `OTP_MISSING`          | Required UUID or OTP is missing from request.        |
-| `401`     | `OTP_INVALID`          | The provided OTP is incorrect.                       |
-| `401`     | `OTP_EXPIRED`          | The OTP has expired.                                 |
-| `401`     | `OTP_ATTEMPTS`         | The OTP retry limit has been reached.                |
-| `401`     | `REQUEST_MISMATCH`     | The request body does not match the expected data.   |
-| `500`     | `SERVICE_HEALTH`       | Health check of the service, including Redis status. |
+| Status Code | Message                    | Description                                          |
+| ----------- | -------------------------- | ---------------------------------------------------- |
+| `200`     | `OTP_GENERATED`          | OTP was successfully generated.                      |
+| `200`     | `OTP_VERIFIED`           | OTP was successfully verified.                       |
+| `400`     | `REQUEST_BODY_INVALID`   | The request body is invalid or improperly formatted. |
+| `400`     | `TTL_INVALID`            | The `ttl` parameter is out of range.                 |
+| `400`     | `RETRY_INVALID`          | The `retry_limit` parameter is out of range.         |
+| `400`     | `CODE_LENGTH_INVALID`    | The `code_length` parameter is out of range.         |
+| `400`     | `OTP_MISSING`            | Required UUID or OTP is missing from request.        |
+| `401`, `500`     | `OTP_INVALID`           | The provided OTP is incorrect.                       |
+| `401`     | `OTP_EXPIRED`            | The OTP has expired.                                 |
+| `401`     | `OTP_ATTEMPTS`           | The OTP retry limit has been reached.                |
+| `401`     | `REQUEST_BODY_MISMATCH`  | The request body does not match the expected data.   |
+| `429`     | `RATE_LIMIT_EXCEEDED`    | Rate limit exceeded.                                 |
+| `200`, `500`     | `SERVICE_HEALTH`         | Health check of the service, including Redis status. |
+
 
 ## Additional Notes
 
@@ -217,7 +212,7 @@ curl --silent --location --request POST 'localhost:8080/?ttl=60&retry_limit=5&co
 #### Example 4: Verify OTP with No Strict Validation
 
 ```bash
-curl --silent --location --request GET 'localhost:8080/e63ee3c4-9ebe-42a3-8c2a-e05e88c468a4/174464' \
+curl --silent --location --request GET 'localhost:8080/?uuid=e63ee3c4-9ebe-42a3-8c2a-e05e88c468a4&otp=174464' \
 --header 'Content-Type: application/json' \
 --data '{}'
 ```
@@ -225,7 +220,7 @@ curl --silent --location --request GET 'localhost:8080/e63ee3c4-9ebe-42a3-8c2a-e
 #### Example 5: Verify OTP with Strict Validation Enabled
 
 ```bash
-curl --silent --location --request GET 'localhost:8080/f49c8bb4-e88e-453e-a878-b69c42c0a32a/720041' \
+curl --silent --location --request GET 'localhost:8080/?uuid=e63ee3c4-9ebe-42a3-8c2a-e05e88c468a4&otp=174464' \
 --header 'Content-Type: application/json' \
 --data '{
     "lowecase tag": "Value",
@@ -251,11 +246,15 @@ The OTP service utilizes multiple Redis indices for storing OTPs, as specified i
 
 The `REDIS.INDICES` configuration is crucial for scaling the OTP service effectively, especially under high load. By distributing the OTPs across multiple Redis databases, the service can handle more concurrent requests and reduce contention for Redis resources.
 
+The `REDIS.KEY_PREFIX` configuration allows you to set a prefix for all Redis keys used by the service. This can be useful for namespacing keys, especially if you are using a shared Redis instance for multiple services. If left empty (`""`), no prefix will be added. Example: if the prefix is set to `"OTP"`, all keys will be stored as `"OTP:<key>"`.
+
+The `REDIS.TIMEOUT` configuration allows you to set a timeout for Redis connections. This is useful for ensuring that the service does not get stuck waiting for a Redis connection that is not responding. The default value is `5s`.
+
 ### Additional Configuration Parameters
 
 The OTP service also provides additional configuration parameters that can be adjusted in the `CONFIG` section of the configuration file.
 
-- **`HASH_REDIS_KEY`**: If set to `true`, the Redis keys used to store OTPs are hashed using SHA-256. This helps to prevent any potential key collisions and makes the keys more secure. It is recommended to keep this value as `true` for production environments.
-- **`REDIS_KEY_PREFIX`**: This parameter allows you to set a prefix for all Redis keys used by the service. This can be useful for namespacing keys, especially if you are using a shared Redis instance for multiple services. If left empty (`""`), no prefix will be added. Example: if the prefix is set to `"OTP"`, all keys will be stored as `"OTP:<key>"`.
+- **`CONFIG.HASH_KEY`**: If set to `true`, the Redis keys used to store OTPs are hashed using SHA-256. This helps to prevent any potential key collisions and makes the keys more secure. It is recommended to keep this value as `true` for production environments.
+- **`SERVER.DEBUG`**: If set to `true`, the service will log additional debug information, which can be helpful for troubleshooting. It is recommended to keep this value as `true` for production environments.
 
 If you have any questions or issues, feel free to reach out for support.

@@ -4,10 +4,12 @@ REDIS:
   PASSWORD: ""
   INDICES: "0"
   KEY_PREFIX: "" #CAN BE EMPTY
+  TIMEOUT: 5
 
 SERVER:
   HOST: "localhost"
   PORT: "8080"
+  DEBUG: true
 
 CONFIG:
   HASH_KEYS: true
