@@ -195,23 +195,26 @@ func isRateLimited(clientID string) bool {
 }
 
 // generateOTP generates a random OTP code based on the given length and character set complexity
-func generateOTP(codeLength int, useAlphaNumeric bool) (string, error) {
+func generateOTP(length int, useAlphaNumeric bool) (string, error) {
+	const numericChars = "0123456789"
+	const alphaChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+
 	var charSet string
+	charSet = numericChars
 	if useAlphaNumeric {
-		charSet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-	} else {
-		charSet = "0123456789"
+		charSet += alphaChars
 	}
 
-	otpCode := make([]byte, codeLength)
-	for i := 0; i < codeLength; i++ {
+	otpBytes := make([]byte, length)
+	for i := 0; i < length; i++ {
 		num, err := rand.Int(rand.Reader, big.NewInt(int64(len(charSet))))
 		if err != nil {
 			return "", err
 		}
-		otpCode[i] = charSet[num.Int64()]
+		otpBytes[i] = charSet[num.Int64()]
 	}
-	return string(otpCode), nil
+
+	return string(otpBytes), nil
 }
 
 // generateRedisKey generates a Redis key using SHA-256 hash of the request UUID
