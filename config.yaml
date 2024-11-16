@@ -1,16 +1,16 @@
-REDIS:
-  HOST: "localhost"
-  PORT: "6379"
-  PASSWORD: ""
-  INDICES: "0"
-  KEY_PREFIX: "" #CAN BE EMPTY
-  TIMEOUT: 5
+redis:
+  host: "localhost"
+  port: "6379"
+  password: ""
+  indices: "0-5"
+  key_prefix: "" #can be empty
+  timeout: 5
 
-SERVER:
-  HOST: "localhost"
-  PORT: "8080"
-  DEBUG: true
+server:
+  host: "localhost"
+  port: "8080"
+  mode: "test" # can be "release", "debug" or "test". default is "release"
 
-CONFIG:
-  HASH_KEYS: true
+config:
+  hash_keys: true
 

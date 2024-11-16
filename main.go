@@ -34,21 +34,21 @@ var (
 // Config structure to hold server, redis, and general configurations
 type Config struct {
 	Redis struct {
-		Host      string `mapstructure:"HOST"`
-		Port      string `mapstructure:"PORT"`
-		Password  string `mapstructure:"PASSWORD"`
-		Indices   string `mapstructure:"INDICES"`
-		KeyPrefix string `mapstructure:"KEY_PREFIX"`
-		Timeout   int    `mapstructure:"TIMEOUT"`
-	} `mapstructure:"REDIS"`
+		Host      string `mapstructure:"host"`
+		Port      string `mapstructure:"port"`
+		Password  string `mapstructure:"password"`
+		Indices   string `mapstructure:"indices"`
+		KeyPrefix string `mapstructure:"key_prefix"`
+		Timeout   int    `mapstructure:"timeout"`
+	} `mapstructure:"redis"`
 	Server struct {
-		Host  string `mapstructure:"HOST"`
-		Port  string `mapstructure:"PORT"`
-		Debug bool   `mapstructure:"DEBUG"`
-	} `mapstructure:"SERVER"`
+		Host string `mapstructure:"host"`
+		Port string `mapstructure:"port"`
+		Mode string `mapstructure:"mode"`
+	} `mapstructure:"server"`
 	Config struct {
-		HashKeys bool `mapstructure:"HASH_KEYS"`
-	} `mapstructure:"CONFIG"`
+		HashKeys bool `mapstructure:"hash_keys"`
+	} `mapstructure:"config"`
 }
 
 const (
@@ -80,15 +80,16 @@ func loadConfig() {
 	viper.AutomaticEnv()
 
 	// Bind environment variables to specific keys in the config
-	viper.BindEnv("REDIS.HOST", "REDIS_HOST")
-	viper.BindEnv("REDIS.PORT", "REDIS_PORT")
-	viper.BindEnv("REDIS.PASSWORD", "REDIS_PASSWORD")
-	viper.BindEnv("REDIS.KEY_PREFIX", "REDIS_KEY_PREFIX")
-	viper.BindEnv("REDIS.TIMEOUT", "REDIS_TIMEOUT")
-	viper.BindEnv("SERVER.HOST", "SERVER_HOST")
-	viper.BindEnv("SERVER.PORT", "SERVER_PORT")
-	viper.BindEnv("SERVER.DEBUG", "SERVER_DEBUG")
-	viper.BindEnv("CONFIG.HASH_KEYS", "HASH_KEYS")
+	viper.BindEnv("redis.host", "REDIS_HOST")
+	viper.BindEnv("redis.port", "REDIS_PORT")
+	viper.BindEnv("redis.password", "REDIS_PASSWORD")
+	viper.BindEnv("redis.indices", "REDIS_INDICES")
+	viper.BindEnv("redis.key_prefix", "REDIS_KEY_PREFIX")
+	viper.BindEnv("redis.timeout", "REDIS_TIMEOUT")
+	viper.BindEnv("server.host", "SERVER_HOST")
+	viper.BindEnv("server.port", "SERVER_PORT")
+	viper.BindEnv("server.mode", "SERVER_MODE")
+	viper.BindEnv("config.hash_keys", "HASH_KEYS")
 
 	// Unmarshal configuration into Config struct
 	if err := viper.Unmarshal(&config); err != nil {
@@ -119,7 +120,7 @@ func initRedis() {
 func init() {
 	// Initialize logger
 	logger.SetFormatter(&logrus.JSONFormatter{})
-	logger.SetLevel(logrus.DebugLevel)
+	logger.SetLevel(logrus.InfoLevel)
 
 	// Load configuration
 	loadConfig()
@@ -127,8 +128,10 @@ func init() {
 	// Initialize Redis client
 	initRedis()
 
-	if !config.Server.Debug {
-		logger.SetLevel(logrus.InfoLevel)
+	logger.SetLevel(logrus.InfoLevel)
+
+	if config.Server.Mode != "release" {
+		logger.SetLevel(logrus.TraceLevel)
 	}
 }
 
@@ -350,10 +353,10 @@ func healthCheckMiddleware() gin.HandlerFunc {
 			// Prepare response data with sensitive config masking
 			responseData := map[string]interface{}{
 				"redis_status": "Unavailable",
-				"config":       config,
+				"config":       "***********",
 			}
-			if !config.Server.Debug {
-				responseData["config"] = "***********"
+			if config.Server.Mode == "debug" {
+				responseData["config"] = config
 			}
 
 			sendAPIResponse(c, http.StatusServiceUnavailable, StatusServiceHealth, responseData)
@@ -366,11 +369,12 @@ func healthCheckMiddleware() gin.HandlerFunc {
 
 // generateOTPHandler handles the POST request to generate an OTP
 func generateOTPHandler(c *gin.Context) {
-	clientID := c.ClientIP()
-	if isRateLimited(clientID) {
-		sendAPIResponse(c, http.StatusTooManyRequests, StatusRateLimitExceeded, nil)
-		return
-	}
+	// clientID := c.ClientIP()
+	// if isRateLimited(clientID) {
+	// 	sendAPIResponse(c, http.StatusTooManyRequests, StatusRateLimitExceeded, nil)
+	// 	return
+	// }
+	logger.Info("OTP generated successfully")
 
 	var otpRequest OTPRequest
 
@@ -416,6 +420,8 @@ func generateOTPHandler(c *gin.Context) {
 
 	// Generate UUID and save OTP to Redis
 	requestUUID := uuid.New().String()
+
+	// Set UUID in context for later use in middleware
 	c.Set("uuid", requestUUID)
 	if err := saveOTPToRedis(requestUUID, otpRequest); err != nil {
 		sendAPIResponse(c, http.StatusInternalServerError, StatusRedisUnavailable, nil)
@@ -423,9 +429,15 @@ func generateOTPHandler(c *gin.Context) {
 	}
 
 	// Send response with generated UUID
-	sendAPIResponse(c, http.StatusOK, StatusOTPGenearted, map[string]string{
+	responseData := map[string]interface{}{
 		"uuid": requestUUID,
-	})
+	}
+
+	if config.Server.Mode == "test" {
+		responseData["otp"] = otpRequest.OTP
+	}
+
+	sendAPIResponse(c, http.StatusOK, StatusOTPGenearted, responseData)
 }
 
 // verifyOTPHandler handles the GET request to verify an OTP
@@ -553,11 +565,13 @@ func updateRetryLimitInRedis(uuid string, otpData *OTPRequest) error {
 // main function with graceful shutdown
 func main() {
 
+	// Set up Gin router with CORS
 	gin.SetMode(gin.ReleaseMode)
 
-	// Set up Gin router with CORS
-	if config.Server.Debug {
+	if config.Server.Mode == "debug" {
 		gin.SetMode(gin.DebugMode)
+	} else if config.Server.Mode == "test" {
+		gin.SetMode(gin.TestMode)
 	}
 
 	r := gin.Default()
@@ -579,10 +593,10 @@ func main() {
 		// Prepare response data with sensitive config masking
 		responseData := map[string]interface{}{
 			"redis_status": "OK",
-			"config":       config,
+			"config":       "***********",
 		}
-		if !config.Server.Debug {
-			responseData["config"] = "***********"
+		if config.Server.Mode == "debug" {
+			responseData["config"] = config
 		}
 
 		sendAPIResponse(c, http.StatusOK, StatusServiceHealth, responseData)

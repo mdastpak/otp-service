@@ -8,6 +8,7 @@ This README provides details on the API endpoints, input parameters, expected re
   - [Generate OTP](#generate-otp)
   - [Verify OTP](#verify-otp)
   - [Health Check](#health-check)
+- [Postman Collection](#postman-collection)
 - [Request Parameters](#request-parameters)
 - [Response Structure](#response-structure)
 - [Status Code Guide](#status-code-guide)
@@ -118,6 +119,10 @@ curl -X GET "http://localhost:8080/health"
   }
 }
 ```
+
+## Postman Collection
+
+You can find the Postman collection for this service [here](https://web.postman.co/workspace/be07ea85-299a-4d7f-a2c9-61cd33071f4b/collection/11658275-de41dacd-ab9b-4600-969d-2b62d60300c6).
 
 ## Request Parameters
 
