@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -16,7 +17,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
@@ -42,9 +42,21 @@ type Config struct {
 		Timeout   int    `mapstructure:"timeout"`
 	} `mapstructure:"redis"`
 	Server struct {
-		Host string `mapstructure:"host"`
-		Port string `mapstructure:"port"`
-		Mode string `mapstructure:"mode"`
+		Host    string `mapstructure:"host"`
+		Port    string `mapstructure:"port"`
+		Mode    string `mapstructure:"mode"`
+		Timeout struct {
+			Read       int `mapstructure:"read"`
+			Write      int `mapstructure:"write"`
+			Idle       int `mapstructure:"idle"`
+			ReadHeader int `mapstructure:"read_header"`
+		}
+		TLS struct {
+			Enabled     bool   `mapstructure:"enabled"`
+			CertFile    string `mapstructure:"cert_file"`
+			KeyFile     string `mapstructure:"key_file"`
+			ClientCerts string `mapstructure:"client_certs"`
+		} `mapstructure:"tls"`
 	} `mapstructure:"server"`
 	Config struct {
 		HashKeys bool `mapstructure:"hash_keys"`
@@ -565,9 +577,10 @@ func updateRetryLimitInRedis(uuid string, otpData *OTPRequest) error {
 	return nil
 }
 
-// main function with graceful shutdown
+// Main function with TLS support and graceful shutdown
 func main() {
 
+	// Set up Gin with security headers
 	// Set up Gin router with CORS
 	gin.SetMode(gin.ReleaseMode)
 
@@ -577,14 +590,25 @@ func main() {
 		gin.SetMode(gin.TestMode)
 	}
 
-	r := gin.Default()
-	r.Use(cors.New(cors.Config{
-		AllowOrigins: []string{"*"},
-		AllowMethods: []string{"GET", "POST"},
-		AllowHeaders: []string{"Origin", "Content-Type"},
-	}))
-	r.Use(gin.Logger())
-	r.Use(healthCheckMiddleware())
+	r := gin.New()
+	r.Use(
+		gin.Recovery(),
+		securityHeadersMiddleware(),
+	)
+
+	// Set up TLS
+	var tlsConfig *tls.Config
+	if config.Server.TLS.Enabled {
+		cert, err := tls.LoadX509KeyPair(config.Server.TLS.CertFile, config.Server.TLS.KeyFile)
+		if err != nil {
+			handleFatalError("Failed to load TLS certificates", err)
+		}
+
+		tlsConfig = &tls.Config{
+			Certificates: []tls.Certificate{cert},
+			MinVersion:   tls.VersionTLS12,
+		}
+	}
 
 	// Register routes
 	r.POST("/", generateOTPHandler)
@@ -605,44 +629,118 @@ func main() {
 		sendAPIResponse(c, http.StatusOK, StatusServiceHealth, responseData)
 	})
 
-	// Set up server
-	serverAddress := fmt.Sprintf("%s:%s", config.Server.Host, config.Server.Port)
+	// Set up HTTP server with timeouts
 	server := &http.Server{
-		Addr:    serverAddress,
-		Handler: r,
+		Addr:              fmt.Sprintf("%s:%s", config.Server.Host, config.Server.Port),
+		Handler:           r,
+		TLSConfig:         tlsConfig,
+		ReadTimeout:       time.Duration(config.Server.Timeout.Read) * time.Second,
+		WriteTimeout:      time.Duration(config.Server.Timeout.Write) * time.Second,
+		IdleTimeout:       time.Duration(config.Server.Timeout.Idle) * time.Second,
+		ReadHeaderTimeout: time.Duration(config.Server.Timeout.ReadHeader) * time.Second,
 	}
 
-	// Channel to listen for OS interrupt signals for graceful shutdown
+	// Graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
-	// Goroutine to handle shutdown when signal is received
 	go func() {
 		<-quit
 		logger.Info("Shutting down server...")
 
-		// Create a context with timeout for graceful shutdown
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
-		// Attempt to gracefully shutdown the server
 		if err := server.Shutdown(ctx); err != nil {
-			handleFatalError("Server forced to shutdown", err)
+			logger.Fatalf("Server forced to shutdown: %v", err)
 		}
 
-		// Close Redis connection
 		if err := redisClient.Close(); err != nil {
-			handleFatalError("Error closing Redis client", err)
-		} else {
-			logger.Info("Redis client closed successfully")
+			logger.Errorf("Error closing Redis client: %v", err)
 		}
-
-		logger.Info("Server exiting")
 	}()
 
-	// Start the server
-	logger.Infof("Starting server on port %s", serverAddress)
-	if err := server.ListenAndServe(); err != http.ErrServerClosed {
-		handleFatalError("Server failed to start", err)
+	// Start server
+	logger.Infof("Starting server on %s", server.Addr)
+	if config.Server.TLS.Enabled {
+		if err := server.ListenAndServeTLS("", ""); err != http.ErrServerClosed {
+			handleFatalError("Failed to start server", err)
+		}
+	} else {
+		if err := server.ListenAndServe(); err != http.ErrServerClosed {
+			handleFatalError("Failed to start server", err)
+		}
+	}
+}
+
+// securityHeadersMiddleware adds security headers to the response
+func securityHeadersMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Clickjacking Protection
+		c.Header("X-Frame-Options", "DENY")
+
+		// Prevent MIME type sniffing
+		c.Header("X-Content-Type-Options", "nosniff")
+
+		// XSS Protection in browsers
+		c.Header("X-XSS-Protection", "1; mode=block")
+
+		//
+		c.Header("X-Permitted-Cross-Domain-Policies", "none")
+
+		// Content Security Policy Configuration
+		csp := []string{
+			"default-src 'self'",
+			"script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+			"style-src 'self' 'unsafe-inline'",
+			"img-src 'self' data:",
+			"font-src 'self'",
+			"form-action 'self'",
+			"frame-ancestors 'none'",
+			"base-uri 'self'",
+			"block-all-mixed-content",
+		}
+		c.Header("Content-Security-Policy", strings.Join(csp, "; "))
+
+		// Add Referrer Policy
+		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
+
+		// تنظیم HSTS - فقط در محیط production با SSL
+		// HSTS Configuration - Only in production environment with SSL
+		if config.Server.TLS.Enabled {
+			c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
+		}
+		c.Header("X-Download-Options", "noopen")
+		c.Header("X-DNS-Prefetch-Control", "off")
+
+		// Prevent caching sensitive data
+		c.Header("Cache-Control", "no-store, max-age=0")
+		c.Header("Pragma", "no-cache")
+
+		// Limit information leakage about the server
+		c.Header("X-Powered-By", "")
+		c.Header("Server", "")
+
+		// Add Permissions-Policy header
+		featurePolicy := []string{
+			"camera 'none'",
+			"microphone 'none'",
+			"geolocation 'none'",
+			"payment 'none'",
+			"usb 'none'",
+			"fullscreen 'self'",
+		}
+		c.Header("Permissions-Policy", strings.Join(featurePolicy, ", "))
+
+		// Cross-Origin-Embedder-Policy
+		c.Header("Cross-Origin-Embedder-Policy", "require-corp")
+
+		// Cross-Origin-Opener-Policy
+		c.Header("Cross-Origin-Opener-Policy", "same-origin")
+
+		// Cross-Origin-Resource-Policy
+		c.Header("Cross-Origin-Resource-Policy", "same-origin")
+
+		c.Next()
 	}
 }

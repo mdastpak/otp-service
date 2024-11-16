@@ -10,6 +10,17 @@ server:
   host: "localhost"
   port: "8080"
   mode: "test" # can be "release", "debug" or "test". default is "release"
+  timeout:
+    read: 5
+    write: 10
+    idle: 120
+    read_header: 2
+  tls: 
+    enabled: false
+    cert_file: "cert.pem"
+    key_file: "key.pem"
+    client_certs: "client_certs.pem"
+
 
 config:
   hash_keys: true
