@@ -1,43 +1,15 @@
-# Dockerfile for OTP Service
-
-# Use the official Golang image to create a binary.
-FROM golang:latest AS builder
-
-# Set the Current Working Directory inside the container
+# Build stage
+FROM golang:latest-alpine AS builder
 WORKDIR /app
-
-# Copy go mod and sum files
-COPY go.mod go.sum ./
-
-# Download dependencies
-RUN go mod download
-
-# Copy the source code into the container
 COPY . .
+RUN go mod download
+RUN CGO_ENABLED=0 GOOS=linux go build -o main cmd/server/main.go
 
-# Build the application
-RUN GOOS=linux GOARCH=amd64 go build -o otp-service
-
-# Use a minimal image to run the service
+# Run stage
 FROM alpine:latest
+WORKDIR /app
+COPY --from=builder /app/main .
+COPY config/config.yaml ./config/
 
-# Install required libraries
-RUN apk --no-cache add ca-certificates libc6-compat bash
-
-# Set the Current Working Directory inside the container
-WORKDIR /root/
-
-# Copy the pre-built binary file from the builder
-COPY --from=builder /app/otp-service .
-
-# Copy the config file
-COPY config.yaml .
-
-# Make the binary executable
-RUN chmod +x otp-service
-
-# Expose the port that the service will run on
 EXPOSE 8080
-
-# Run the OTP service binary
-CMD ["./otp-service"]
+CMD ["./main"]

@@ -2,7 +2,7 @@ redis:
   host: "localhost"
   port: "6379"
   password: ""
-  indices: "0-5"
+  db: "0-5"
   key_prefix: "" #can be empty
   timeout: 5
 
