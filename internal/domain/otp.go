@@ -19,11 +19,11 @@ type OTP struct {
 
 // OTPRequest represents the request for OTP generation
 type OTPRequest struct {
-	TTL              int  `form:"ttl"`
-	RetryLimit       int  `form:"retry_limit"`
-	CodeLength       int  `form:"code_length"`
-	StrictValidation bool `form:"strict_validation"`
-	UseAlphaNumeric  bool `form:"use_alpha_numeric"`
+	TTL              int  `form:"ttl,default=60"`
+	RetryLimit       int  `form:"retry_limit,default=5"`
+	CodeLength       int  `form:"code_length,default=6"`
+	StrictValidation bool `form:"strict_validation,default=false"`
+	UseAlphaNumeric  bool `form:"use_alpha_numeric,default=false"`
 }
 
 // OTPResponse represents the response for OTP operations
