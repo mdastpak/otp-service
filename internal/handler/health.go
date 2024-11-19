@@ -32,7 +32,7 @@ func (h *HealthHandler) Check(c *gin.Context) {
 	}
 
 	// Add config information in debug/test mode
-	if h.config.Server.Mode == "debug" || h.config.Server.Mode == "test" {
+	if h.config.Server.Mode == "debug" {
 		healthInfo["config"] = gin.H{
 			"redis": gin.H{
 				"host":       h.config.Redis.Host,

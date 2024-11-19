@@ -25,7 +25,7 @@ type otpService struct {
 func NewOTPService(repo domain.OTPRepository, serverMode string) domain.OTPService {
 	return &otpService{
 		repo:     repo,
-		testMode: serverMode == "test",
+		testMode: serverMode == "debug",
 	}
 }
 

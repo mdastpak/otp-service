@@ -19,10 +19,12 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"otp-service/config"
+	"otp-service/internal/domain"
 	"otp-service/internal/handler"
 	"otp-service/internal/middleware"
 	"otp-service/internal/repository/redis"
 	"otp-service/internal/service"
+	"otp-service/pkg/cache"
 	"otp-service/pkg/logger"
 	"otp-service/pkg/utils"
 )
@@ -58,12 +60,6 @@ func main() {
 	case "debug":
 		gin.SetMode(gin.DebugMode)
 		log.Debug("Running in DEBUG mode")
-	case "test":
-		gin.SetMode(gin.TestMode)
-		log.Debug("Running in TEST mode")
-	case "release":
-		gin.SetMode(gin.ReleaseMode)
-		log.Info("Running in RELEASE mode")
 	default:
 		gin.SetMode(gin.ReleaseMode)
 		log.Warn("Unknown mode, defaulting to RELEASE mode")
@@ -82,12 +78,40 @@ func main() {
 	// Start Redis connection monitoring
 	go monitorRedisConnection(cfg)
 
-	// Initialize dependencies
-	otpRepo := redis.NewOTPRepository(rdb, keyMgr)
+	// Initialize cache with monitoring
+	cacheCalculator := cache.NewCacheSizeCalculator()
+	maxSize, err := cacheCalculator.CalculateMaxSize()
+	if err != nil {
+		log.Warn("Failed to calculate optimal cache size, using default:", err)
+		maxSize = 10000
+	}
 
-	otpService := service.NewOTPService(otpRepo, cfg.Server.Mode)
+	cacheOpts := cache.Options{
+		MaxSize:         maxSize,
+		CleanupInterval: 5 * time.Minute, // Will be adjusted by TTLAnalyzer
+	}
+
+	// Create local cache
+	localCache := cache.NewLocalCache(cacheOpts)
+
+	// Initialize dependencies
+	baseRepo := redis.NewOTPRepository(rdb, keyMgr)
+
+	// Create monitored cached repository with all dependencies
+	cachedRepo := redis.NewCachedOTPRepository(baseRepo, localCache, rdb, keyMgr)
+
+	// Type assert to MonitoredRepository
+	monitoredRepo, ok := cachedRepo.(domain.MonitoredRepository)
+	if !ok {
+		log.Fatal("Failed to create monitored repository")
+	}
+
+	otpService := service.NewOTPService(cachedRepo, cfg.Server.Mode)
 	otpHandler := handler.NewOTPHandler(otpService)
 	healthHandler := handler.NewHealthHandler(cfg)
+
+	// Initialize cache monitor
+	monitor := cache.NewCacheMonitor(monitoredRepo.GetCache(), monitoredRepo.GetMetrics())
 
 	// Initialize router
 	router := gin.New()
@@ -103,8 +127,16 @@ func main() {
 	router.Use(m.Metrics())
 	router.Use(checkRedisConnection())
 
-	if cfg.Server.Mode == "debug" || cfg.Server.Mode == "test" {
-		middleware.MonitorRedisDistribution(otpRepo)
+	if cfg.Server.Mode == "debug" {
+		go func() {
+			ticker := time.NewTicker(1 * time.Minute)
+			defer ticker.Stop()
+
+			for range ticker.C {
+				monitoredRepo.DebugDBDistribution()
+			}
+		}()
+
 	}
 
 	// Start cleanup goroutine for rate limiter
@@ -116,6 +148,10 @@ func main() {
 	router.GET("/", otpHandler.VerifyOTP)
 	router.GET("/health", healthHandler.Check)
 	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
+	router.GET("/debug/cache/stats", func(c *gin.Context) {
+		stats := monitor.GetStats()
+		c.JSON(http.StatusOK, stats)
+	})
 
 	// Create server
 	server := &http.Server{

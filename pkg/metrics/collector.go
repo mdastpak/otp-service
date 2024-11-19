@@ -64,6 +64,30 @@ var (
 		},
 		[]string{"db"},
 	)
+
+	CacheHits = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: "otp_service",
+			Name:      "cache_hits_total",
+			Help:      "Total number of cache hits",
+		},
+	)
+
+	CacheMisses = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: "otp_service",
+			Name:      "cache_misses_total",
+			Help:      "Total number of cache misses",
+		},
+	)
+
+	CacheEvictions = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: "otp_service",
+			Name:      "cache_evictions_total",
+			Help:      "Total number of cache evictions",
+		},
+	)
 )
 
 // RecordRedisOperation records the duration of a Redis operation

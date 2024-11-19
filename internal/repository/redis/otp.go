@@ -35,7 +35,7 @@ type otpStorageData struct {
 	OriginalJSON     json.RawMessage `json:"original_json,omitempty"` // Added for strict validation
 }
 
-func NewOTPRepository(client *redis.Client, keyMgr *utils.RedisKeyManager) domain.MonitoredRepository {
+func NewOTPRepository(client *redis.Client, keyMgr *utils.RedisKeyManager) domain.OTPRepository {
 	return &otpRepository{
 		client: client,
 		keyMgr: keyMgr,

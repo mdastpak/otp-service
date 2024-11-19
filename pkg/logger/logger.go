@@ -28,7 +28,7 @@ func InitLogger(cfg *Config) {
 	}
 
 	switch cfg.Mode {
-	case "debug", "test":
+	case "debug":
 		log.SetLevel(logrus.DebugLevel)
 		log.SetFormatter(formatter)
 		log.SetReportCaller(true)

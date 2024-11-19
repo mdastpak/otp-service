@@ -2,7 +2,10 @@
 
 package domain
 
-import "context"
+import (
+	"context"
+	"otp-service/pkg/cache"
+)
 
 type OTPRepository interface {
 	Store(ctx context.Context, otp *OTP) error
@@ -19,4 +22,7 @@ type RepositoryMonitor interface {
 type MonitoredRepository interface {
 	OTPRepository
 	RepositoryMonitor
+	GetCache() *cache.LocalCache
+	GetMetrics() *cache.CacheMetrics
+	DebugDBDistribution()
 }

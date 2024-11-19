@@ -45,7 +45,7 @@ type OTPResponse struct {
 
 // TestMode helps to check if we're running in test mode
 func IsTestMode(mode string) bool {
-	return mode == "test"
+	return mode == "debug"
 }
 
 type VerifyRequest struct {
