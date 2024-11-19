@@ -1,25 +1,48 @@
-# docker-compose.yaml for OTP Service
+version: '3.8'
 
 services:
   otp-service:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: otp-service
     ports:
       - "8080:8080"
     environment:
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=
-      - REDIS_INDICES=0-5
-      - REDIS_KEY_PREFIX=
-      - REDIS_TIMEOUT=5
-      - SERVER_HOST=0.0.0.0
-      - SERVER_PORT=8080
-      - SERVER_MODE=test
-      - HASH_KEYS=true
+      - TZ=Asia/Tehran
     depends_on:
       - redis
+    networks:
+      - otp-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   redis:
-    image: redis:alpine
+    image: redis:7.2-alpine
+    container_name: otp-redis
+    command: redis-server --appendonly yes
     ports:
-      - "6380:6379"
+      - "6379:6379"
+    # volumes:
+    #   - redis-data:/data
+    networks:
+      - otp-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+networks:
+  otp-network:
+    driver: bridge
+
+# volumes:
+#   redis-data:
+#     driver: local
