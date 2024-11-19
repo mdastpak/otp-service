@@ -16,7 +16,7 @@ services:
       - REDIS_HASH_KEYS=true
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
-      - SERVER_MODE=test
+      - SERVER_MODE=debug
       - SERVER_TIMEOUT_READ=5
       - SERVER_TIMEOUT_WRITE=10
       - SERVER_TIMEOUT_IDLE=120
