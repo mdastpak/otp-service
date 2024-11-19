@@ -4,6 +4,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"otp-service/internal/domain"
@@ -33,11 +34,9 @@ func (s *otpService) Generate(ctx context.Context, req *domain.OTPRequest) (*dom
 		return nil, err
 	}
 
-	code := utils.GenerateOTP(req.CodeLength, req.UseAlphaNumeric)
-
 	otp := &domain.OTP{
 		UUID:             uuid.New().String(),
-		Code:             code,
+		Code:             utils.GenerateOTP(req.CodeLength, req.UseAlphaNumeric),
 		TTL:              req.TTL,
 		RetryLimit:       req.RetryLimit,
 		StrictValidation: req.StrictValidation,
@@ -46,46 +45,37 @@ func (s *otpService) Generate(ctx context.Context, req *domain.OTPRequest) (*dom
 		ExpiresAt:        time.Now().Add(time.Duration(req.TTL) * time.Second),
 	}
 
+	// Store original JSON if strict validation is enabled
+	if req.StrictValidation && len(req.RawJSON) > 0 {
+		otp.OriginalJSON = req.RawJSON
+	}
+
 	if err := s.repo.Store(ctx, otp); err != nil {
-		logger.Error("Failed to store OTP in Redis: ", err)
 		return nil, fmt.Errorf("failed to store OTP: %w", err)
 	}
 
 	response := &domain.OTPResponse{
 		Status:  http.StatusOK,
 		Message: "OTP_GENERATED",
-		Info: struct {
-			UUID string `json:"uuid,omitempty"`
-			OTP  string `json:"otp,omitempty"` // Changed from Code to OTP
-		}{
+		Info: domain.OTPResponseInfo{
 			UUID: otp.UUID,
 		},
 	}
 
-	// Include OTP code only in test mode
+	// Include OTP in response only in test mode
 	if s.testMode {
-		response.Info.OTP = otp.Code // Changed to use OTP field
-		logger.Warn("Test Mode: OTP included in response: ", otp.Code)
+		response.Info.OTP = otp.Code
 	}
 
 	return response, nil
 }
 
-func (s *otpService) Verify(ctx context.Context, uuid string, code string) error {
-	otp, err := s.repo.Get(ctx, uuid)
+func (s *otpService) Verify(ctx context.Context, req *domain.VerifyRequest) error {
+	otp, err := s.repo.Get(ctx, req.UUID)
 	if err != nil {
 		return err
 	}
 
-	// Verify OTP
-	if err := s.verifyOTP(otp, code); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (s *otpService) verifyOTP(otp *domain.OTP, code string) error {
 	// Check expiration
 	if time.Now().After(otp.ExpiresAt) {
 		return domain.ErrOTPExpired
@@ -96,11 +86,62 @@ func (s *otpService) verifyOTP(otp *domain.OTP, code string) error {
 		return domain.ErrOTPAttempts
 	}
 
-	// Verify code
-	if otp.Code != code {
+	// For strict validation, validate JSON payload
+	if otp.StrictValidation {
+		if len(otp.OriginalJSON) > 0 {
+			// Must have request body when strict validation is enabled
+			if len(req.StrictRequest) == 0 {
+				otp.RetryCount++
+				if err := s.repo.Update(ctx, otp); err != nil {
+					return err
+				}
+				logger.Debug("Strict validation failed: No request body provided")
+				return domain.ErrRequestBodyMismatch
+			}
+
+			// Normalize and compare JSONs
+			originalJSON := normalizeJSON(otp.OriginalJSON)
+			receivedJSON := normalizeJSON(req.StrictRequest)
+
+			logger.Debug(fmt.Sprintf("Comparing JSONs:\nOriginal: %s\nReceived: %s",
+				originalJSON, receivedJSON))
+
+			if originalJSON != receivedJSON {
+				otp.RetryCount++
+				if err := s.repo.Update(ctx, otp); err != nil {
+					return err
+				}
+				logger.Debug("Strict validation failed: JSON mismatch")
+				return domain.ErrRequestBodyMismatch
+			}
+		}
+	}
+
+	// Verify OTP code
+	if otp.Code != req.Code {
 		otp.RetryCount++
+		if err := s.repo.Update(ctx, otp); err != nil {
+			return err
+		}
 		return domain.ErrOTPInvalid
 	}
 
 	return nil
+}
+
+// normalizeJSON removes whitespace but preserves case sensitivity
+func normalizeJSON(data json.RawMessage) string {
+	var obj interface{}
+	if err := json.Unmarshal(data, &obj); err != nil {
+		logger.Error("Failed to unmarshal JSON for normalization: ", err)
+		return ""
+	}
+
+	normalized, err := json.Marshal(obj)
+	if err != nil {
+		logger.Error("Failed to marshal normalized JSON: ", err)
+		return ""
+	}
+
+	return string(normalized)
 }

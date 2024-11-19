@@ -4,11 +4,6 @@ package domain
 
 import "context"
 
-type OTPService interface {
-	Generate(ctx context.Context, req *OTPRequest) (*OTPResponse, error)
-	Verify(ctx context.Context, uuid string, code string) error
-}
-
 type OTPRepository interface {
 	Store(ctx context.Context, otp *OTP) error
 	Get(ctx context.Context, uuid string) (*OTP, error)

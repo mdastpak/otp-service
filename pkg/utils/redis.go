@@ -31,12 +31,23 @@ func NewRedisKeyManager(config RedisKeyConfig) *RedisKeyManager {
 func (m *RedisKeyManager) GetKey(uuid string) string {
 	key := uuid
 	if m.config.HashKeys {
-		key = m.hashKey(uuid)
+		// If HashKeys is true, hash the UUID
+		hash := sha256.Sum256([]byte(uuid))
+		key = fmt.Sprintf("%x", hash)
 	}
+
+	// Add prefix if configured
 	if m.config.KeyPrefix != "" {
 		key = fmt.Sprintf("%s:%s", m.config.KeyPrefix, key)
 	}
+
 	return key
+}
+
+// GenHashedKey generates SHA-256 hash of a key (used when HashKeys is true)
+func (m *RedisKeyManager) hashKey(key string) string {
+	hash := sha256.Sum256([]byte(key))
+	return fmt.Sprintf("%x", hash)
 }
 
 func (m *RedisKeyManager) GetShardIndex(uuid string) (int, error) {
@@ -95,6 +106,13 @@ func getHashedIndex(uuid string, min, max int) int {
 	return index
 }
 
+func (m *RedisKeyManager) GetKeyPattern() string {
+	if m.config.KeyPrefix != "" {
+		return fmt.Sprintf("%s:*", m.config.KeyPrefix)
+	}
+	return "*"
+}
+
 // For debugging purposes
 func (m *RedisKeyManager) DebugShardDistribution(uuids []string) map[int]int {
 	distribution := make(map[int]int)
@@ -109,14 +127,21 @@ func (m *RedisKeyManager) DebugShardDistribution(uuids []string) map[int]int {
 	return distribution
 }
 
-func (m *RedisKeyManager) hashKey(uuid string) string {
-	hash := sha256.Sum256([]byte(uuid))
-	return fmt.Sprintf("%x", hash)
-}
+// For debugging purposes, add a method to show key transformation
+func (m *RedisKeyManager) DebugKeyTransformation(uuid string) string {
+	originalKey := uuid
+	finalKey := m.GetKey(uuid)
 
-func (m *RedisKeyManager) GetKeyPattern() string {
-	if m.config.KeyPrefix != "" {
-		return fmt.Sprintf("%s:*", m.config.KeyPrefix)
+	var transformation string
+	if m.config.HashKeys {
+		transformation = fmt.Sprintf("Original UUID: %s\nHashed: %s\n", originalKey, m.hashKey(uuid))
+	} else {
+		transformation = fmt.Sprintf("Original UUID: %s (not hashed)\n", originalKey)
 	}
-	return "*"
+
+	if m.config.KeyPrefix != "" {
+		transformation += fmt.Sprintf("Final key with prefix: %s", finalKey)
+	}
+
+	return transformation
 }

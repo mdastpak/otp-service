@@ -2,9 +2,10 @@ redis:
   host: "localhost"
   port: "6379"
   password: ""
-  db: "0-5"
+  db: "0"
   key_prefix: "" #can be empty
   timeout: 5
+  hash_keys: true
 
 server:
   host: "localhost"
@@ -20,8 +21,3 @@ server:
     cert_file: "cert.pem"
     key_file: "key.pem"
     client_certs: "client_certs.pem"
-
-
-config:
-  hash_keys: true
-

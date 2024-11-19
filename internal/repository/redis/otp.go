@@ -13,11 +13,24 @@ import (
 	"otp-service/pkg/utils"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/sirupsen/logrus"
 )
 
 type otpRepository struct {
 	client *redis.Client
 	keyMgr *utils.RedisKeyManager
+}
+
+type otpStorageData struct {
+	Code             string          `json:"code"`
+	TTL              int             `json:"ttl"`
+	RetryLimit       int             `json:"retry_limit"`
+	RetryCount       int             `json:"retry_count"`
+	StrictValidation bool            `json:"strict_validation"`
+	UseAlphaNumeric  bool            `json:"use_alpha_numeric"`
+	CreatedAt        time.Time       `json:"created_at"`
+	ExpiresAt        time.Time       `json:"expires_at"`
+	OriginalJSON     json.RawMessage `json:"original_json,omitempty"` // Added for strict validation
 }
 
 func NewOTPRepository(client *redis.Client, keyMgr *utils.RedisKeyManager) domain.MonitoredRepository {
@@ -37,7 +50,6 @@ func (r *otpRepository) getRedisClient(dbIndex int) *redis.Client {
 }
 
 func (r *otpRepository) Store(ctx context.Context, otp *domain.OTP) error {
-	// Get DB index for this UUID
 	dbIndex, err := r.keyMgr.GetShardIndex(otp.UUID)
 	if err != nil {
 		return fmt.Errorf("failed to get shard index: %w", err)
@@ -48,7 +60,21 @@ func (r *otpRepository) Store(ctx context.Context, otp *domain.OTP) error {
 	defer client.Close()
 
 	key := r.keyMgr.GetKey(otp.UUID)
-	data, err := json.Marshal(otp)
+
+	// Convert to storage format (excluding UUID)
+	storageData := otpStorageData{
+		Code:             otp.Code,
+		TTL:              otp.TTL,
+		RetryLimit:       otp.RetryLimit,
+		RetryCount:       otp.RetryCount,
+		StrictValidation: otp.StrictValidation,
+		UseAlphaNumeric:  otp.UseAlphaNumeric,
+		CreatedAt:        otp.CreatedAt,
+		ExpiresAt:        otp.ExpiresAt,
+		OriginalJSON:     otp.OriginalJSON,
+	}
+
+	data, err := json.Marshal(storageData)
 	if err != nil {
 		return fmt.Errorf("failed to marshal OTP: %w", err)
 	}
@@ -58,7 +84,15 @@ func (r *otpRepository) Store(ctx context.Context, otp *domain.OTP) error {
 		return fmt.Errorf("failed to store OTP in Redis DB %d: %w", dbIndex, err)
 	}
 
-	logger.Debug(fmt.Sprintf("Stored OTP in Redis DB %d with key %s", dbIndex, key))
+	// Debug logging for key transformation
+	if logger.GetLogger().Level == logrus.DebugLevel {
+		logger.Debug(fmt.Sprintf("Key transformation: \n%s",
+			r.keyMgr.DebugKeyTransformation(otp.UUID)))
+	}
+
+	logger.Debug(fmt.Sprintf("Stored OTP in Redis DB %d with key %s and JSON: %s",
+		dbIndex, key, string(otp.OriginalJSON)))
+
 	return nil
 }
 
@@ -81,13 +115,26 @@ func (r *otpRepository) Get(ctx context.Context, uuid string) (*domain.OTP, erro
 		return nil, fmt.Errorf("failed to get OTP from Redis DB %d: %w", dbIndex, err)
 	}
 
-	var otp domain.OTP
-	if err := json.Unmarshal(data, &otp); err != nil {
+	var storageData otpStorageData
+	if err := json.Unmarshal(data, &storageData); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal OTP: %w", err)
 	}
 
+	// Convert back to domain model
+	otp := &domain.OTP{
+		UUID:             uuid, // Add back the UUID from the request
+		Code:             storageData.Code,
+		TTL:              storageData.TTL,
+		RetryLimit:       storageData.RetryLimit,
+		RetryCount:       storageData.RetryCount,
+		StrictValidation: storageData.StrictValidation,
+		UseAlphaNumeric:  storageData.UseAlphaNumeric,
+		CreatedAt:        storageData.CreatedAt,
+		ExpiresAt:        storageData.ExpiresAt,
+	}
+
 	logger.Debug(fmt.Sprintf("Retrieved OTP from Redis DB %d with key %s", dbIndex, key))
-	return &otp, nil
+	return otp, nil
 }
 
 func (r *otpRepository) Update(ctx context.Context, otp *domain.OTP) error {
@@ -111,7 +158,19 @@ func (r *otpRepository) Update(ctx context.Context, otp *domain.OTP) error {
 		return fmt.Errorf("failed to get TTL for OTP in Redis DB %d: %w", dbIndex, err)
 	}
 
-	data, err := json.Marshal(otp)
+	// Convert to storage format
+	storageData := otpStorageData{
+		Code:             otp.Code,
+		TTL:              otp.TTL,
+		RetryLimit:       otp.RetryLimit,
+		RetryCount:       otp.RetryCount,
+		StrictValidation: otp.StrictValidation,
+		UseAlphaNumeric:  otp.UseAlphaNumeric,
+		CreatedAt:        otp.CreatedAt,
+		ExpiresAt:        otp.ExpiresAt,
+	}
+
+	data, err := json.Marshal(storageData)
 	if err != nil {
 		return fmt.Errorf("failed to marshal OTP: %w", err)
 	}
