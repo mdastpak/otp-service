@@ -11,7 +11,6 @@ import (
 
 func (m *Middleware) Logger() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Start timer
 		start := time.Now()
 		path := c.Request.URL.Path
 		raw := c.Request.URL.RawQuery
@@ -24,7 +23,7 @@ func (m *Middleware) Logger() gin.HandlerFunc {
 			return
 		}
 
-		// Get response status and latency
+		// Calculate latency
 		latency := time.Since(start)
 		status := c.Writer.Status()
 
@@ -32,13 +31,6 @@ func (m *Middleware) Logger() gin.HandlerFunc {
 			path = path + "?" + raw
 		}
 
-		// Collect errors if any
-		var errorMessages string
-		for _, err := range c.Errors {
-			errorMessages += err.Error() + ";"
-		}
-
-		// Determine log level based on status code
 		logFields := map[string]interface{}{
 			"status":    status,
 			"latency":   latency,
@@ -47,10 +39,14 @@ func (m *Middleware) Logger() gin.HandlerFunc {
 			"path":      path,
 		}
 
-		if errorMessages != "" {
-			logFields["errors"] = errorMessages
+		// Only log errors from context if status is error
+		if status >= 400 {
+			if len(c.Errors) > 0 {
+				logFields["errors"] = c.Errors.String()
+			}
 		}
 
+		// Log based on status code
 		if status >= 500 {
 			logger.Error("Request failed", logFields)
 		} else if status >= 400 {

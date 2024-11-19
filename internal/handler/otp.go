@@ -3,9 +3,9 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"otp-service/internal/domain"
-	"otp-service/pkg/logger"
 	"otp-service/pkg/utils"
 
 	"github.com/gin-gonic/gin"
@@ -24,15 +24,24 @@ func NewOTPHandler(service domain.OTPService) *OTPHandler {
 // GenerateOTP handles OTP generation requests
 func (h *OTPHandler) GenerateOTP(c *gin.Context) {
 	var req domain.OTPRequest
+
+	// Set default values
+	req = domain.OTPRequest{
+		TTL:              60,
+		RetryLimit:       5,
+		CodeLength:       6,
+		StrictValidation: false,
+		UseAlphaNumeric:  false,
+	}
+
+	// Bind request parameters, overriding defaults if provided
 	if err := c.ShouldBindQuery(&req); err != nil {
-		logger.Error("Failed to bind request params: ", err)
-		utils.RespondWithError(c, domain.ErrInvalidRequest)
+		utils.RespondWithError(c, fmt.Errorf("%w: %v", domain.ErrInvalidRequest, err))
 		return
 	}
 
 	resp, err := h.service.Generate(c.Request.Context(), &req)
 	if err != nil {
-		logger.Error("Failed to generate OTP: ", err)
 		utils.RespondWithError(c, err)
 		return
 	}

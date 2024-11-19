@@ -25,7 +25,7 @@ func NewOTPService(repo domain.OTPRepository) domain.OTPService {
 func (s *otpService) Generate(ctx context.Context, req *domain.OTPRequest) (*domain.OTPResponse, error) {
 	// Validate request using the validator
 	if err := utils.ValidateOTPRequest(req); err != nil {
-		logger.Error("Request validation failed: ", err)
+		// Let the handler handle the error logging
 		return nil, err
 	}
 
@@ -42,7 +42,8 @@ func (s *otpService) Generate(ctx context.Context, req *domain.OTPRequest) (*dom
 
 	// Store OTP
 	if err := s.repo.Store(ctx, otp); err != nil {
-		logger.Error("Failed to store OTP: ", err)
+		// Log only storage errors here
+		logger.Error("Failed to store OTP in Redis: ", err)
 		return nil, fmt.Errorf("failed to store OTP: %w", err)
 	}
 

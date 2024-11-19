@@ -80,19 +80,23 @@ var ErrorResponse = map[string]APIError{
 
 // RespondWithError sends a JSON error response
 func RespondWithError(c *gin.Context, err error) {
-	// Log the error
-	logger.Error("API Error: ", err)
-
 	// Convert error to string code
 	errCode := err.Error()
 
 	// Check if error exists in predefined responses
 	if apiErr, exists := ErrorResponse[errCode]; exists {
+		// Don't log validation errors as they're not system errors
+		if apiErr.Status >= 500 {
+			logger.Error("System error occurred: ", err)
+		} else if apiErr.Status >= 400 {
+			logger.Warn("Request error: ", err)
+		}
 		c.JSON(apiErr.Status, apiErr)
 		return
 	}
 
-	// Default error response for unknown errors
+	// Log unknown errors
+	logger.Error("Unknown error occurred: ", err)
 	c.JSON(http.StatusInternalServerError, APIError{
 		Status:  http.StatusInternalServerError,
 		Message: "Internal server error",
