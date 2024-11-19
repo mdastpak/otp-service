@@ -32,8 +32,7 @@ type OTPResponse struct {
 	Message string `json:"message"`
 	Info    struct {
 		UUID string `json:"uuid,omitempty"`
-		// Code will only be populated in test mode
-		Code string `json:"code,omitempty"`
+		OTP  string `json:"otp,omitempty"` // Changed from Code to OTP
 	} `json:"info,omitempty"`
 }
 

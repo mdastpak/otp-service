@@ -56,7 +56,7 @@ func (s *otpService) Generate(ctx context.Context, req *domain.OTPRequest) (*dom
 		Message: "OTP_GENERATED",
 		Info: struct {
 			UUID string `json:"uuid,omitempty"`
-			Code string `json:"code,omitempty"`
+			OTP  string `json:"otp,omitempty"` // Changed from Code to OTP
 		}{
 			UUID: otp.UUID,
 		},
@@ -64,8 +64,8 @@ func (s *otpService) Generate(ctx context.Context, req *domain.OTPRequest) (*dom
 
 	// Include OTP code only in test mode
 	if s.testMode {
-		response.Info.Code = otp.Code
-		logger.Warn("Test Mode: OTP code included in response: ", otp.Code)
+		response.Info.OTP = otp.Code // Changed to use OTP field
+		logger.Warn("Test Mode: OTP included in response: ", otp.Code)
 	}
 
 	return response, nil
