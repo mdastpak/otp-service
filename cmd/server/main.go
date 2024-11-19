@@ -41,7 +41,7 @@ var (
 
 func main() {
 	// Load configuration
-	cfg, err := config.LoadConfig("config/config.yaml")
+	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Fatal("Failed to load config: ", err)
 	}

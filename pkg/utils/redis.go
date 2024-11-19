@@ -36,9 +36,11 @@ func (m *RedisKeyManager) GetKey(uuid string) string {
 		key = fmt.Sprintf("%x", hash)
 	}
 
-	// Add prefix if configured
+	// Add prefix if configured, ensure it has a colon separator
 	if m.config.KeyPrefix != "" {
-		key = fmt.Sprintf("%s:%s", m.config.KeyPrefix, key)
+		// Remove any existing colons from the end of prefix
+		prefix := strings.TrimRight(m.config.KeyPrefix, ":")
+		key = fmt.Sprintf("%s:%s", prefix, key)
 	}
 
 	return key
@@ -106,9 +108,12 @@ func getHashedIndex(uuid string, min, max int) int {
 	return index
 }
 
+// GetKeyPattern returns the pattern for finding keys
 func (m *RedisKeyManager) GetKeyPattern() string {
 	if m.config.KeyPrefix != "" {
-		return fmt.Sprintf("%s:*", m.config.KeyPrefix)
+		// Remove any existing colons from the end of prefix
+		prefix := strings.TrimRight(m.config.KeyPrefix, ":")
+		return fmt.Sprintf("%s:*", prefix)
 	}
 	return "*"
 }
@@ -127,20 +132,31 @@ func (m *RedisKeyManager) DebugShardDistribution(uuids []string) map[int]int {
 	return distribution
 }
 
-// For debugging purposes, add a method to show key transformation
+// For debugging, add a method to show key transformation
 func (m *RedisKeyManager) DebugKeyTransformation(uuid string) string {
 	originalKey := uuid
-	finalKey := m.GetKey(uuid)
+	prefix := ""
+	if m.config.KeyPrefix != "" {
+		prefix = strings.TrimRight(m.config.KeyPrefix, ":")
+	}
 
 	var transformation string
 	if m.config.HashKeys {
-		transformation = fmt.Sprintf("Original UUID: %s\nHashed: %s\n", originalKey, m.hashKey(uuid))
+		hash := sha256.Sum256([]byte(uuid))
+		hashedKey := fmt.Sprintf("%x", hash)
+		transformation = fmt.Sprintf("Original UUID: %s\nHashed: %s\n", originalKey, hashedKey)
+		if prefix != "" {
+			transformation += fmt.Sprintf("Final key with prefix: %s:%s", prefix, hashedKey)
+		} else {
+			transformation += fmt.Sprintf("Final key: %s", hashedKey)
+		}
 	} else {
-		transformation = fmt.Sprintf("Original UUID: %s (not hashed)\n", originalKey)
-	}
-
-	if m.config.KeyPrefix != "" {
-		transformation += fmt.Sprintf("Final key with prefix: %s", finalKey)
+		if prefix != "" {
+			transformation = fmt.Sprintf("Original UUID: %s\nFinal key with prefix: %s:%s",
+				originalKey, prefix, originalKey)
+		} else {
+			transformation = fmt.Sprintf("Original UUID: %s (not prefixed)", originalKey)
+		}
 	}
 
 	return transformation

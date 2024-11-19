@@ -10,7 +10,7 @@ redis:
 server:
   host: "localhost"
   port: "8080"
-  mode: "test" # can be "release", "debug" or "test". default is "release"
+  mode: "release" # can be "release", "debug" or "test". default is "release"
   timeout:
     read: 5
     write: 10

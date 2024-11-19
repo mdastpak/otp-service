@@ -3,6 +3,8 @@
 package config
 
 import (
+	"fmt"
+
 	"github.com/spf13/viper"
 )
 
@@ -10,8 +12,6 @@ type Config struct {
 	Redis  RedisConfig  `mapstructure:"redis"`
 	Server ServerConfig `mapstructure:"server"`
 }
-
-// config/config.go
 
 type RedisConfig struct {
 	Host      string `mapstructure:"host"`
@@ -45,17 +45,48 @@ type TLSConfig struct {
 	ClientCerts string `mapstructure:"client_certs"`
 }
 
-func LoadConfig(path string) (*Config, error) {
-	viper.SetConfigFile(path)
+func LoadConfig() (*Config, error) {
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath("./config")
+	viper.AddConfigPath(".")
+
+	// Read config file
+	if err := viper.ReadInConfig(); err != nil {
+		return nil, fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	// Enable environment variables
 	viper.AutomaticEnv()
 
-	if err := viper.ReadInConfig(); err != nil {
-		return nil, err
-	}
+	// Bind environment variables
+	viper.BindEnv("redis.host", "REDIS_HOST")
+	viper.BindEnv("redis.port", "REDIS_PORT")
+	viper.BindEnv("redis.password", "REDIS_PASSWORD")
+	viper.BindEnv("redis.db", "REDIS_DB")
+	viper.BindEnv("redis.key_prefix", "REDIS_KEY_PREFIX")
+	viper.BindEnv("redis.timeout", "REDIS_TIMEOUT")
+	viper.BindEnv("redis.hash_keys", "REDIS_HASH_KEYS")
+
+	viper.BindEnv("server.host", "SERVER_HOST")
+	viper.BindEnv("server.port", "SERVER_PORT")
+	viper.BindEnv("server.mode", "SERVER_MODE")
+
+	// Server timeouts
+	viper.BindEnv("server.timeout.read", "SERVER_TIMEOUT_READ")
+	viper.BindEnv("server.timeout.write", "SERVER_TIMEOUT_WRITE")
+	viper.BindEnv("server.timeout.idle", "SERVER_TIMEOUT_IDLE")
+	viper.BindEnv("server.timeout.read_header", "SERVER_TIMEOUT_READ_HEADER")
+
+	// TLS settings
+	viper.BindEnv("server.tls.enabled", "TLS_ENABLED")
+	viper.BindEnv("server.tls.cert_file", "TLS_CERT_FILE")
+	viper.BindEnv("server.tls.key_file", "TLS_KEY_FILE")
+	viper.BindEnv("server.tls.client_certs", "TLS_CLIENT_CERTS")
 
 	config := &Config{}
 	if err := viper.Unmarshal(config); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
 	return config, nil
