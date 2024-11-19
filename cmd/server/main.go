@@ -8,11 +8,13 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	redisClient "github.com/go-redis/redis/v8"
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 
 	"otp-service/config"
@@ -24,9 +26,17 @@ import (
 	"otp-service/pkg/utils"
 )
 
+type redisManager struct {
+	client *redisClient.Client
+	mu     sync.RWMutex
+}
+
 var (
-	log *logrus.Logger
-	rdb *redisClient.Client
+	log      *logrus.Logger
+	rdb      *redisClient.Client
+	redisMgr = &redisManager{
+		mu: sync.RWMutex{},
+	}
 )
 
 func main() {
@@ -59,11 +69,21 @@ func main() {
 	}
 
 	// Initialize Redis connection
-	rdb = initRedisClient(cfg)
+	rdb, keyMgr := initRedisClient(cfg)
+	if rdb == nil {
+		log.Warn("Initial Redis connection failed, will retry in background")
+	} else {
+		redisMgr.setClient(rdb)
+		log.Info("Initial Redis connection successful")
+	}
 	defer rdb.Close()
 
+	// Start Redis connection monitoring
+	go monitorRedisConnection(cfg)
+
 	// Initialize dependencies
-	otpRepo := redis.NewOTPRepository(rdb, cfg.Redis.KeyPrefix)
+	otpRepo := redis.NewOTPRepository(rdb, keyMgr)
+
 	otpService := service.NewOTPService(otpRepo, cfg.Server.Mode)
 	otpHandler := handler.NewOTPHandler(otpService)
 	healthHandler := handler.NewHealthHandler(cfg)
@@ -81,6 +101,10 @@ func main() {
 	router.Use(m.RateLimit())
 	router.Use(m.Metrics())
 	router.Use(checkRedisConnection())
+
+	if cfg.Server.Mode == "debug" || cfg.Server.Mode == "test" {
+		middleware.MonitorRedisDistribution(otpRepo)
+	}
 
 	// Start cleanup goroutine for rate limiter
 
@@ -129,13 +153,37 @@ func main() {
 	log.Info("Server exited successfully")
 }
 
-func initRedisClient(cfg *config.Config) *redisClient.Client {
+func (rm *redisManager) setClient(client *redisClient.Client) {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+	if rm.client != nil {
+		_ = rm.client.Close()
+	}
+	rm.client = client
+}
 
+func (rm *redisManager) getClient() *redisClient.Client {
+	rm.mu.RLock()
+	defer rm.mu.RUnlock()
+	return rm.client
+}
+
+func initRedisClient(cfg *config.Config) (*redisClient.Client, *utils.RedisKeyManager) {
 	keyMgr := utils.NewRedisKeyManager(utils.RedisKeyConfig{
-		HashKeys:  cfg.Redis.HashKeys,
 		KeyPrefix: cfg.Redis.KeyPrefix,
+		HashKeys:  cfg.Redis.HashKeys,
 		DB:        cfg.Redis.DB,
 	})
+
+	// Test distribution in debug mode
+	if cfg.Server.Mode == "debug" {
+		testUUIDs := make([]string, 100)
+		for i := 0; i < 100; i++ {
+			testUUIDs[i] = uuid.New().String()
+		}
+		distribution := keyMgr.DebugShardDistribution(testUUIDs)
+		log.Debug("Redis shard distribution simulation: ", distribution)
+	}
 
 	selectedDB, err := keyMgr.GetShardIndex("initial")
 	if err != nil {
@@ -143,42 +191,43 @@ func initRedisClient(cfg *config.Config) *redisClient.Client {
 		selectedDB = 0
 	}
 
-	rdb := redisClient.NewClient(&redisClient.Options{
+	client := redisClient.NewClient(&redisClient.Options{
 		Addr:        fmt.Sprintf("%s:%s", cfg.Redis.Host, cfg.Redis.Port),
 		Password:    cfg.Redis.Password,
 		DB:          selectedDB,
 		DialTimeout: time.Duration(cfg.Redis.Timeout) * time.Second,
 	})
 
-	// Test connection
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	if err := rdb.Ping(ctx).Err(); err != nil {
-		log.Error("Failed to connect to Redis: ", err)
-		return rdb // Return client anyway to allow service to start
-	}
-
-	log.Info("Successfully connected to Redis")
-	return rdb
+	return client, keyMgr
 }
 
 func checkRedisConnection() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Skip health check endpoint
 		if c.Request.URL.Path == "/health" {
 			c.Next()
 			return
 		}
 
-		ctx := c.Request.Context()
-		if err := rdb.Ping(ctx).Err(); err != nil {
-			log.Error("Redis connection failed: ", err)
+		client := redisMgr.getClient()
+		if client == nil {
 			c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{
 				"status":  http.StatusServiceUnavailable,
 				"message": "REDIS_UNAVAILABLE",
 			})
 			return
 		}
+
+		err := client.Ping(c.Request.Context()).Err()
+		if err != nil {
+			log.Error("Redis connection check failed: ", err)
+			c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{
+				"status":  http.StatusServiceUnavailable,
+				"message": "REDIS_UNAVAILABLE",
+			})
+			return
+		}
+
 		c.Next()
 	}
 }
@@ -188,11 +237,33 @@ func monitorRedisConnection(cfg *config.Config) {
 	defer ticker.Stop()
 
 	for range ticker.C {
+		client := redisMgr.getClient()
+		if client == nil {
+			log.Warn("Redis client is nil, attempting to initialize")
+			newClient, _ := initRedisClient(cfg)
+			if newClient != nil {
+				redisMgr.setClient(newClient)
+				log.Info("Successfully initialized Redis connection")
+			}
+			continue
+		}
+
 		ctx := context.Background()
-		if err := rdb.Ping(ctx).Err(); err != nil {
+		if err := client.Ping(ctx).Err(); err != nil {
 			log.Error("Redis health check failed: ", err)
+
 			// Try to reconnect
-			rdb = initRedisClient(cfg)
+			newClient, _ := initRedisClient(cfg)
+
+			if err := newClient.Ping(ctx).Err(); err != nil {
+				log.Error("Redis reconnection failed: ", err)
+				newClient.Close()
+				continue
+			}
+
+			// If reconnection was successful, update the client
+			redisMgr.setClient(newClient)
+			log.Info("Successfully reconnected to Redis")
 		}
 	}
 }

@@ -15,3 +15,13 @@ type OTPRepository interface {
 	Update(ctx context.Context, otp *OTP) error
 	Delete(ctx context.Context, uuid string) error
 }
+
+type RepositoryMonitor interface {
+	DebugDBDistribution()
+}
+
+// MonitoredRepository combines both interfaces
+type MonitoredRepository interface {
+	OTPRepository
+	RepositoryMonitor
+}
