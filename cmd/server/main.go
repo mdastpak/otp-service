@@ -64,7 +64,7 @@ func main() {
 
 	// Initialize dependencies
 	otpRepo := redis.NewOTPRepository(rdb, cfg.Redis.KeyPrefix)
-	otpService := service.NewOTPService(otpRepo)
+	otpService := service.NewOTPService(otpRepo, cfg.Server.Mode)
 	otpHandler := handler.NewOTPHandler(otpService)
 	healthHandler := handler.NewHealthHandler(cfg)
 
@@ -83,6 +83,7 @@ func main() {
 	router.Use(checkRedisConnection())
 
 	// Start cleanup goroutine for rate limiter
+
 	m.CleanupLimiters()
 
 	// Register routes

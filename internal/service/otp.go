@@ -14,24 +14,30 @@ import (
 	"github.com/google/uuid"
 )
 
+// internal/service/otp.go
+
 type otpService struct {
-	repo domain.OTPRepository
+	repo     domain.OTPRepository
+	testMode bool
 }
 
-func NewOTPService(repo domain.OTPRepository) domain.OTPService {
-	return &otpService{repo: repo}
+func NewOTPService(repo domain.OTPRepository, serverMode string) domain.OTPService {
+	return &otpService{
+		repo:     repo,
+		testMode: serverMode == "test",
+	}
 }
 
 func (s *otpService) Generate(ctx context.Context, req *domain.OTPRequest) (*domain.OTPResponse, error) {
-	// Validate request using the validator
 	if err := utils.ValidateOTPRequest(req); err != nil {
-		// Let the handler handle the error logging
 		return nil, err
 	}
 
+	code := utils.GenerateOTP(req.CodeLength, req.UseAlphaNumeric)
+
 	otp := &domain.OTP{
 		UUID:             uuid.New().String(),
-		Code:             utils.GenerateOTP(req.CodeLength, req.UseAlphaNumeric),
+		Code:             code,
 		TTL:              req.TTL,
 		RetryLimit:       req.RetryLimit,
 		StrictValidation: req.StrictValidation,
@@ -40,22 +46,29 @@ func (s *otpService) Generate(ctx context.Context, req *domain.OTPRequest) (*dom
 		ExpiresAt:        time.Now().Add(time.Duration(req.TTL) * time.Second),
 	}
 
-	// Store OTP
 	if err := s.repo.Store(ctx, otp); err != nil {
-		// Log only storage errors here
 		logger.Error("Failed to store OTP in Redis: ", err)
 		return nil, fmt.Errorf("failed to store OTP: %w", err)
 	}
 
-	return &domain.OTPResponse{
+	response := &domain.OTPResponse{
 		Status:  http.StatusOK,
 		Message: "OTP_GENERATED",
 		Info: struct {
 			UUID string `json:"uuid,omitempty"`
+			Code string `json:"code,omitempty"`
 		}{
 			UUID: otp.UUID,
 		},
-	}, nil
+	}
+
+	// Include OTP code only in test mode
+	if s.testMode {
+		response.Info.Code = otp.Code
+		logger.Warn("Test Mode: OTP code included in response: ", otp.Code)
+	}
+
+	return response, nil
 }
 
 func (s *otpService) Verify(ctx context.Context, uuid string, code string) error {

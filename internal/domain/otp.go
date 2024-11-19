@@ -32,5 +32,12 @@ type OTPResponse struct {
 	Message string `json:"message"`
 	Info    struct {
 		UUID string `json:"uuid,omitempty"`
+		// Code will only be populated in test mode
+		Code string `json:"code,omitempty"`
 	} `json:"info,omitempty"`
+}
+
+// TestMode helps to check if we're running in test mode
+func IsTestMode(mode string) bool {
+	return mode == "test"
 }

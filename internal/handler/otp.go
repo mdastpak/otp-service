@@ -12,6 +12,7 @@ import (
 )
 
 type OTPHandler struct {
+	BaseHandler
 	service domain.OTPService
 }
 
@@ -21,7 +22,6 @@ func NewOTPHandler(service domain.OTPService) *OTPHandler {
 	}
 }
 
-// GenerateOTP handles OTP generation requests
 func (h *OTPHandler) GenerateOTP(c *gin.Context) {
 	var req domain.OTPRequest
 
@@ -34,7 +34,6 @@ func (h *OTPHandler) GenerateOTP(c *gin.Context) {
 		UseAlphaNumeric:  false,
 	}
 
-	// Bind request parameters, overriding defaults if provided
 	if err := c.ShouldBindQuery(&req); err != nil {
 		utils.RespondWithError(c, fmt.Errorf("%w: %v", domain.ErrInvalidRequest, err))
 		return
