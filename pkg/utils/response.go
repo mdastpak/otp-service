@@ -4,6 +4,7 @@ package utils
 
 import (
 	"net/http"
+	"otp-service/pkg/logger"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -79,6 +80,9 @@ var ErrorResponse = map[string]APIError{
 
 // RespondWithError sends a JSON error response
 func RespondWithError(c *gin.Context, err error) {
+	// Log the error
+	logger.Error("API Error: ", err)
+
 	// Convert error to string code
 	errCode := err.Error()
 

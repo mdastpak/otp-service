@@ -3,10 +3,10 @@
 package middleware
 
 import (
+	"otp-service/pkg/logger"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 )
 
 func (m *Middleware) Logger() gin.HandlerFunc {
@@ -24,27 +24,39 @@ func (m *Middleware) Logger() gin.HandlerFunc {
 			return
 		}
 
-		// Calculate latency
+		// Get response status and latency
 		latency := time.Since(start)
-
-		// Get client IP
-		clientIP := c.ClientIP()
-
-		// Get response status
 		status := c.Writer.Status()
 
 		if raw != "" {
 			path = path + "?" + raw
 		}
 
-		// Log the details
-		logrus.WithFields(logrus.Fields{
+		// Collect errors if any
+		var errorMessages string
+		for _, err := range c.Errors {
+			errorMessages += err.Error() + ";"
+		}
+
+		// Determine log level based on status code
+		logFields := map[string]interface{}{
 			"status":    status,
 			"latency":   latency,
-			"client_ip": clientIP,
+			"client_ip": c.ClientIP(),
 			"method":    c.Request.Method,
 			"path":      path,
-			"errors":    c.Errors.String(),
-		}).Info("Request processed")
+		}
+
+		if errorMessages != "" {
+			logFields["errors"] = errorMessages
+		}
+
+		if status >= 500 {
+			logger.Error("Request failed", logFields)
+		} else if status >= 400 {
+			logger.Warn("Request warning", logFields)
+		} else {
+			logger.Info("Request processed", logFields)
+		}
 	}
 }

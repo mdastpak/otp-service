@@ -4,7 +4,10 @@ package service
 
 import (
 	"context"
+	"fmt"
+	"net/http"
 	"otp-service/internal/domain"
+	"otp-service/pkg/logger"
 	"otp-service/pkg/utils"
 	"time"
 
@@ -22,10 +25,10 @@ func NewOTPService(repo domain.OTPRepository) domain.OTPService {
 func (s *otpService) Generate(ctx context.Context, req *domain.OTPRequest) (*domain.OTPResponse, error) {
 	// Validate request using the validator
 	if err := utils.ValidateOTPRequest(req); err != nil {
+		logger.Error("Request validation failed: ", err)
 		return nil, err
 	}
 
-	// Generate OTP
 	otp := &domain.OTP{
 		UUID:             uuid.New().String(),
 		Code:             utils.GenerateOTP(req.CodeLength, req.UseAlphaNumeric),
@@ -39,11 +42,12 @@ func (s *otpService) Generate(ctx context.Context, req *domain.OTPRequest) (*dom
 
 	// Store OTP
 	if err := s.repo.Store(ctx, otp); err != nil {
-		return nil, err
+		logger.Error("Failed to store OTP: ", err)
+		return nil, fmt.Errorf("failed to store OTP: %w", err)
 	}
 
 	return &domain.OTPResponse{
-		Status:  200,
+		Status:  http.StatusOK,
 		Message: "OTP_GENERATED",
 		Info: struct {
 			UUID string `json:"uuid,omitempty"`

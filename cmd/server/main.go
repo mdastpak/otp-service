@@ -30,23 +30,33 @@ var (
 )
 
 func main() {
-	// Initialize logger
-	logger.InitLogger(&logger.Config{
-		Level:        "debug",
-		ReportCaller: true,
-		JSONFormat:   true,
-	})
-	log = logger.GetLogger()
-	log.Info("Starting OTP service...")
-
 	// Load configuration
 	cfg, err := config.LoadConfig("config/config.yaml")
 	if err != nil {
 		log.Fatal("Failed to load config: ", err)
 	}
 
-	// Set Gin mode
-	gin.SetMode(cfg.Server.Mode)
+	// Initialize logger based on mode
+	logger.InitLogger(&logger.Config{
+		Mode: cfg.Server.Mode,
+	})
+	log = logger.GetLogger()
+
+	// Set Gin mode based on configuration
+	switch cfg.Server.Mode {
+	case "debug":
+		gin.SetMode(gin.DebugMode)
+		log.Debug("Running in DEBUG mode")
+	case "test":
+		gin.SetMode(gin.TestMode)
+		log.Debug("Running in TEST mode")
+	case "release":
+		gin.SetMode(gin.ReleaseMode)
+		log.Info("Running in RELEASE mode")
+	default:
+		gin.SetMode(gin.ReleaseMode)
+		log.Warn("Unknown mode, defaulting to RELEASE mode")
+	}
 
 	// Initialize Redis connection
 	rdb = initRedisClient(cfg)
@@ -56,7 +66,7 @@ func main() {
 	otpRepo := redis.NewOTPRepository(rdb, cfg.Redis.KeyPrefix)
 	otpService := service.NewOTPService(otpRepo)
 	otpHandler := handler.NewOTPHandler(otpService)
-	healthHandler := handler.NewHealthHandler()
+	healthHandler := handler.NewHealthHandler(cfg)
 
 	// Initialize router
 	router := gin.New()

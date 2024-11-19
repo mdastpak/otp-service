@@ -14,65 +14,60 @@ var log = logrus.New()
 
 // Config holds logger configuration
 type Config struct {
-	Level        string
+	Mode         string
 	ReportCaller bool
 	JSONFormat   bool
 	Output       io.Writer
 }
 
-// InitLogger initializes the logger with given config
+// InitLogger initializes the logger based on application mode
 func InitLogger(cfg *Config) {
-	// Set log level
-	level, err := logrus.ParseLevel(cfg.Level)
-	if err != nil {
-		level = logrus.InfoLevel
-	}
-	log.SetLevel(level)
-
-	// Set output format
-	if cfg.JSONFormat {
-		log.SetFormatter(&logrus.JSONFormatter{
-			TimestampFormat: time.RFC3339,
-		})
-	} else {
-		log.SetFormatter(&logrus.TextFormatter{
-			TimestampFormat: time.RFC3339,
-			FullTimestamp:   true,
-		})
+	formatter := &CustomFormatter{
+		TimestampFormat: time.RFC3339,
+		FullTimestamp:   true,
 	}
 
-	// Set output
+	switch cfg.Mode {
+	case "debug", "test":
+		log.SetLevel(logrus.DebugLevel)
+		log.SetFormatter(formatter)
+		log.SetReportCaller(true)
+	case "release":
+		log.SetLevel(logrus.InfoLevel)
+		if cfg.JSONFormat {
+			log.SetFormatter(&logrus.JSONFormatter{
+				TimestampFormat: time.RFC3339,
+			})
+		} else {
+			log.SetFormatter(formatter)
+		}
+		log.SetReportCaller(false)
+	}
+
 	if cfg.Output != nil {
 		log.SetOutput(cfg.Output)
 	} else {
 		log.SetOutput(os.Stdout)
 	}
-
-	// Set caller reporting
-	log.SetReportCaller(cfg.ReportCaller)
 }
 
-// GetLogger returns the configured logger instance
 func GetLogger() *logrus.Logger {
 	return log
 }
 
-// Error logs error level message
+// Standard logging methods
 func Error(args ...interface{}) {
 	log.Error(args...)
 }
 
-// Info logs info level message
 func Info(args ...interface{}) {
 	log.Info(args...)
 }
 
-// Debug logs debug level message
 func Debug(args ...interface{}) {
 	log.Debug(args...)
 }
 
-// Warn logs warn level message
 func Warn(args ...interface{}) {
 	log.Warn(args...)
 }
