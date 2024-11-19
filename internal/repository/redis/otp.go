@@ -6,10 +6,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	"otp-service/internal/domain"
 	"otp-service/pkg/logger"
+	"otp-service/pkg/metrics"
 	"otp-service/pkg/utils"
 
 	"github.com/go-redis/redis/v8"
@@ -54,6 +56,11 @@ func (r *otpRepository) Store(ctx context.Context, otp *domain.OTP) error {
 	if err != nil {
 		return fmt.Errorf("failed to get shard index: %w", err)
 	}
+
+	start := time.Now()
+	defer func() {
+		metrics.RecordRedisOperation("store", strconv.Itoa(dbIndex), start)
+	}()
 
 	// Get client for specific DB
 	client := r.getRedisClient(dbIndex)
@@ -226,5 +233,22 @@ func (r *otpRepository) DebugDBDistribution() {
 			continue
 		}
 		logger.Debug(fmt.Sprintf("Redis DB %d has %d keys", i, len(keys)))
+	}
+}
+
+func (r *otpRepository) monitorActiveOTPs() {
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		for db := 0; db <= 5; db++ {
+			client := r.getRedisClient(db)
+			keys, err := client.Keys(context.Background(), r.keyMgr.GetKeyPattern()).Result()
+			if err != nil {
+				logger.Error(fmt.Sprintf("Failed to get keys from DB %d: %v", db, err))
+				continue
+			}
+			metrics.UpdateActiveOTPs(strconv.Itoa(db), len(keys))
+		}
 	}
 }

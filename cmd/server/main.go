@@ -15,6 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 	redisClient "github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 
 	"otp-service/config"
@@ -114,6 +115,7 @@ func main() {
 	router.POST("/", otpHandler.GenerateOTP)
 	router.GET("/", otpHandler.VerifyOTP)
 	router.GET("/health", healthHandler.Check)
+	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	// Create server
 	server := &http.Server{

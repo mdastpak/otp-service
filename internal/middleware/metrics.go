@@ -3,6 +3,7 @@
 package middleware
 
 import (
+	"otp-service/pkg/metrics"
 	"strconv"
 	"time"
 
@@ -47,5 +48,23 @@ func (m *Middleware) Metrics() gin.HandlerFunc {
 
 		httpRequestsTotal.WithLabelValues(method, path, status).Inc()
 		httpRequestDuration.WithLabelValues(method, path).Observe(duration.Seconds())
+	}
+}
+
+func MetricsMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		start := time.Now()
+
+		// Process request
+		c.Next()
+
+		// Record metrics after processing
+		status := c.Writer.Status()
+		metrics.RecordRequest(
+			c.Request.Method,
+			c.Request.URL.Path,
+			status,
+			start,
+		)
 	}
 }
