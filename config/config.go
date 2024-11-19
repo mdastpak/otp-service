@@ -11,13 +11,16 @@ type Config struct {
 	Server ServerConfig `mapstructure:"server"`
 }
 
+// config/config.go
+
 type RedisConfig struct {
 	Host      string `mapstructure:"host"`
 	Port      string `mapstructure:"port"`
 	Password  string `mapstructure:"password"`
-	DB        int    `mapstructure:"db"` // Changed from indices to db
+	DB        string `mapstructure:"db"`
 	KeyPrefix string `mapstructure:"key_prefix"`
 	Timeout   int    `mapstructure:"timeout"`
+	HashKeys  bool   `mapstructure:"hash_keys"`
 }
 
 type ServerConfig struct {

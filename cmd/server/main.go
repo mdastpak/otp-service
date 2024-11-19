@@ -21,6 +21,7 @@ import (
 	"otp-service/internal/repository/redis"
 	"otp-service/internal/service"
 	"otp-service/pkg/logger"
+	"otp-service/pkg/utils"
 )
 
 var (
@@ -118,10 +119,23 @@ func main() {
 }
 
 func initRedisClient(cfg *config.Config) *redisClient.Client {
+
+	keyMgr := utils.NewRedisKeyManager(utils.RedisKeyConfig{
+		HashKeys:  cfg.Redis.HashKeys,
+		KeyPrefix: cfg.Redis.KeyPrefix,
+		DB:        cfg.Redis.DB,
+	})
+
+	selectedDB, err := keyMgr.GetShardIndex("initial")
+	if err != nil {
+		log.Error("Failed to determine Redis DB: ", err)
+		selectedDB = 0
+	}
+
 	rdb := redisClient.NewClient(&redisClient.Options{
 		Addr:        fmt.Sprintf("%s:%s", cfg.Redis.Host, cfg.Redis.Port),
 		Password:    cfg.Redis.Password,
-		DB:          cfg.Redis.DB,
+		DB:          selectedDB,
 		DialTimeout: time.Duration(cfg.Redis.Timeout) * time.Second,
 	})
 
