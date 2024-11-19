@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   otp-service:
     build:
@@ -11,7 +9,8 @@ services:
     environment:
       - TZ=Asia/Tehran
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     networks:
       - otp-network
     restart: unless-stopped
@@ -28,8 +27,6 @@ services:
     command: redis-server --appendonly yes
     ports:
       - "6379:6379"
-    # volumes:
-    #   - redis-data:/data
     networks:
       - otp-network
     restart: unless-stopped
@@ -42,7 +39,3 @@ services:
 networks:
   otp-network:
     driver: bridge
-
-# volumes:
-#   redis-data:
-#     driver: local
