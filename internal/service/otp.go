@@ -78,11 +78,19 @@ func (s *otpService) Verify(ctx context.Context, req *domain.VerifyRequest) erro
 
 	// Check expiration
 	if time.Now().After(otp.ExpiresAt) {
+		if err := s.repo.Delete(ctx, req.UUID); err != nil {
+			// Log the error but don't return it to the client since verification was successful
+			logger.Error(fmt.Sprintf("Failed to delete Expired OTP %s: %v", req.UUID, err))
+		}
 		return domain.ErrOTPExpired
 	}
 
 	// Check retry limit
 	if otp.RetryCount >= otp.RetryLimit {
+		if err := s.repo.Delete(ctx, req.UUID); err != nil {
+			// Log the error but don't return it to the client since verification was successful
+			logger.Error(fmt.Sprintf("Failed to delete Invalid Retry Attempts OTP %s: %v", req.UUID, err))
+		}
 		return domain.ErrOTPAttempts
 	}
 
@@ -124,6 +132,14 @@ func (s *otpService) Verify(ctx context.Context, req *domain.VerifyRequest) erro
 			return err
 		}
 		return domain.ErrOTPInvalid
+	}
+
+	// If we get here, verification was successful - Delete the OTP
+	if err := s.repo.Delete(ctx, req.UUID); err != nil {
+		// Log the error but don't return it to the client since verification was successful
+		logger.Error(fmt.Sprintf("Failed to delete verified OTP %s: %v", req.UUID, err))
+	} else {
+		logger.Debug(fmt.Sprintf("Successfully deleted verified OTP %s", req.UUID))
 	}
 
 	return nil
