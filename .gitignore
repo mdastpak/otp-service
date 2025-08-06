@@ -24,9 +24,6 @@ otp-service_unix
 # Test configurations
 config_test.yaml
 
-# Scripts
-validate_tests.py
-
 # Dependency directories (remove the comment below to include it)
 # vendor/
 

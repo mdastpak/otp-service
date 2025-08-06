@@ -159,8 +159,9 @@ make coverage
 
 ### Test Validation (without Go)
 ```bash
-# Validate test structure
-python3 validate_tests.py
+# Validate test structure using standard tools
+find . -name "*_test.go" | wc -l  # Count test files
+go list ./... | grep -v vendor | wc -l  # Count packages
 ```
 
 ## Coverage Goals
