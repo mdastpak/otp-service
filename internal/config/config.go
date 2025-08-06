@@ -136,7 +136,6 @@ func LoadConfig() (*Config, error) {
 		logger.Debugf("DEBUG Config - Admin.Enabled: %v", config.Admin.Enabled)
 		logger.Debugf("DEBUG Config - Admin.AllowedIPs: %v", config.Admin.AllowedIPs)
 	}
-
 	return &config, nil
 }
 
