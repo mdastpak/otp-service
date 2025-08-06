@@ -17,11 +17,19 @@ import (
 	"otp-service/internal/models"
 )
 
+// ShardConfig caches parsed shard configuration for performance
+type ShardConfig struct {
+	shardCount int
+	startIndex int
+	isRange    bool
+}
+
 type Client struct {
-	client *redis.Client
-	config *config.Config
-	logger *logrus.Logger
-	ctx    context.Context
+	client      *redis.Client
+	config      *config.Config
+	logger      *logrus.Logger
+	ctx         context.Context
+	shardConfig *ShardConfig
 }
 
 // NewClient creates a new Redis client with connection pooling
@@ -49,11 +57,15 @@ func NewClient(cfg *config.Config, logger *logrus.Logger) (*Client, error) {
 
 	logger.Info("Connected to Redis successfully")
 
+	// Initialize shard configuration
+	shardConfig := initShardConfig(cfg)
+
 	return &Client{
-		client: client,
-		config: cfg,
-		logger: logger,
-		ctx:    ctx,
+		client:      client,
+		config:      cfg,
+		logger:      logger,
+		ctx:         ctx,
+		shardConfig: shardConfig,
 	}, nil
 }
 
@@ -68,6 +80,39 @@ func (c *Client) Ping() error {
 	defer cancel()
 	_, err := c.client.Ping(testCtx).Result()
 	return err
+}
+
+// initShardConfig parses and caches shard configuration for performance
+func initShardConfig(cfg *config.Config) *ShardConfig {
+	rangeParts := strings.Split(cfg.Redis.Indices, "-")
+	
+	if cfg.Redis.Indices == "0" {
+		return &ShardConfig{shardCount: 1, startIndex: 0, isRange: false}
+	}
+
+	if len(rangeParts) == 1 {
+		count, err := strconv.Atoi(rangeParts[0])
+		if err != nil || count <= 0 {
+			panic(fmt.Sprintf("Invalid Redis Indices configuration: %v", err))
+		}
+		return &ShardConfig{shardCount: count, startIndex: 0, isRange: false}
+	} else if len(rangeParts) == 2 {
+		start, err := strconv.Atoi(rangeParts[0])
+		if err != nil {
+			panic(fmt.Sprintf("Invalid Redis Indices start configuration: %v", err))
+		}
+		end, err := strconv.Atoi(rangeParts[1])
+		if err != nil {
+			panic(fmt.Sprintf("Invalid Redis Indices end configuration: %v", err))
+		}
+		count := end - start + 1
+		if count <= 0 {
+			panic("Invalid Redis Indices configuration: range results in zero or negative count")
+		}
+		return &ShardConfig{shardCount: count, startIndex: start, isRange: true}
+	} else {
+		panic("Invalid Redis Indices format. Use a single number or a range (e.g., '0-2')")
+	}
 }
 
 // generateRedisKey generates a Redis key using SHA-256 hash of the request UUID
@@ -89,38 +134,31 @@ func (c *Client) getRedisKey(uuid string) string {
 }
 
 // getShardIndex determines the appropriate Redis shard index based on UUID
+// Uses UUID's inherent randomness for fast, well-distributed sharding
 func (c *Client) getShardIndex(uuid string) int {
-	rangeParts := strings.Split(c.config.Redis.Indices, "-")
-	if c.config.Redis.Indices == "0" {
-		return 0
+	if c.shardConfig.shardCount == 1 {
+		return c.shardConfig.startIndex
 	}
-	if len(rangeParts) == 1 {
-		index, err := strconv.Atoi(rangeParts[0])
-		if err != nil {
-			c.logger.Fatalf("Invalid Redis Indices configuration: %v", err)
-		}
-		if index == 0 {
-			return 0
-		}
-		return int(sha256.Sum256([]byte(uuid))[0]) % index
-	} else if len(rangeParts) == 2 {
-		start, err := strconv.Atoi(rangeParts[0])
-		if err != nil {
-			c.logger.Fatalf("Invalid Redis Indices configuration: %v", err)
-		}
-		end, err := strconv.Atoi(rangeParts[1])
-		if err != nil {
-			c.logger.Fatalf("Invalid Redis Indices configuration: %v", err)
-		}
-		shardRange := end - start + 1
-		if shardRange == 0 {
-			c.logger.Fatalf("Invalid Redis Indices configuration: range results in zero")
-		}
-		return int(sha256.Sum256([]byte(uuid))[0]) % shardRange
-	} else {
-		c.logger.Fatalf("Invalid Redis Indices format. Use a single number or a range (e.g., '0-2')")
+
+	// Use last 8 hex chars (4 bytes) of UUID for good distribution
+	// UUIDs are designed to be random, so this provides excellent distribution
+	cleaned := strings.ReplaceAll(uuid, "-", "")
+	if len(cleaned) < 8 {
+		// Fallback for malformed UUIDs
+		return c.shardConfig.startIndex
 	}
-	return 0
+	
+	lastBytes := cleaned[len(cleaned)-8:] // Last 4 bytes as hex string
+	
+	// Convert hex to uint32 for modulo operation
+	hash, err := strconv.ParseUint(lastBytes, 16, 32)
+	if err != nil {
+		// Fallback for parse errors
+		return c.shardConfig.startIndex
+	}
+	
+	shardOffset := int(hash) % c.shardConfig.shardCount
+	return c.shardConfig.startIndex + shardOffset
 }
 
 // SaveOTP saves the OTP data to Redis under the appropriate shard

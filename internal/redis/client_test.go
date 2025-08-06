@@ -89,8 +89,9 @@ func TestGetShardIndex(t *testing.T) {
 
 			logger := logrus.New()
 			client := &Client{
-				config: cfg,
-				logger: logger,
+				config:      cfg,
+				logger:      logger,
+				shardConfig: initShardConfig(cfg),
 			}
 
 			// Should not panic
@@ -181,8 +182,9 @@ func TestShardIndexConsistency(t *testing.T) {
 
 	logger := logrus.New()
 	client := &Client{
-		config: cfg,
-		logger: logger,
+		config:      cfg,
+		logger:      logger,
+		shardConfig: initShardConfig(cfg),
 	}
 
 	uuid := "consistent-test-uuid"

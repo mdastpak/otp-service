@@ -32,6 +32,15 @@ var (
 	redisClient *redis.Client
 )
 
+// ShardConfig caches parsed shard configuration for performance
+type ShardConfig struct {
+	shardCount int
+	startIndex int
+	isRange    bool
+}
+
+var shardConfig *ShardConfig
+
 // Config structure to hold server, redis, and general configurations
 type Config struct {
 	Redis struct {
@@ -112,6 +121,43 @@ func loadConfig() {
 	// Unmarshal configuration into Config struct
 	if err := viper.Unmarshal(&cfg); err != nil {
 		handleFatalError("Unable to decode into struct", err)
+	}
+
+	// Parse and cache shard configuration
+	initShardConfig()
+}
+
+// initShardConfig parses and caches shard configuration for performance
+func initShardConfig() {
+	rangeParts := strings.Split(cfg.Redis.Indices, "-")
+	
+	if cfg.Redis.Indices == "0" {
+		shardConfig = &ShardConfig{shardCount: 1, startIndex: 0, isRange: false}
+		return
+	}
+
+	if len(rangeParts) == 1 {
+		count, err := strconv.Atoi(rangeParts[0])
+		if err != nil || count <= 0 {
+			handleFatalError("Invalid Redis Indices configuration", err)
+		}
+		shardConfig = &ShardConfig{shardCount: count, startIndex: 0, isRange: false}
+	} else if len(rangeParts) == 2 {
+		start, err := strconv.Atoi(rangeParts[0])
+		if err != nil {
+			handleFatalError("Invalid Redis Indices start configuration", err)
+		}
+		end, err := strconv.Atoi(rangeParts[1])
+		if err != nil {
+			handleFatalError("Invalid Redis Indices end configuration", err)
+		}
+		count := end - start + 1
+		if count <= 0 {
+			handleFatalError("Invalid Redis Indices configuration: range results in zero or negative count", nil)
+		}
+		shardConfig = &ShardConfig{shardCount: count, startIndex: start, isRange: true}
+	} else {
+		handleFatalError("Invalid Redis Indices format. Use a single number or a range (e.g., '0-2')", nil)
 	}
 }
 
@@ -279,38 +325,31 @@ func getRedisKey(uuid string) string {
 }
 
 // getShardIndex determines the appropriate Redis shard index based on UUID
+// Uses UUID's inherent randomness for fast, well-distributed sharding
 func getShardIndex(uuid string) int {
-	rangeParts := strings.Split(cfg.Redis.Indices, "-")
-	if cfg.Redis.Indices == "0" {
-		return 0 // Directly return shard 0 if the index is set to 0
+	if shardConfig.shardCount == 1 {
+		return shardConfig.startIndex
 	}
-	if len(rangeParts) == 1 {
-		index, err := strconv.Atoi(rangeParts[0])
-		if err != nil {
-			handleFatalError("Invalid Redis Indices configuration", err)
-		}
-		if index == 0 {
-			return 0 // Avoid division by zero
-		}
-		return int(sha256.Sum256([]byte(uuid))[0]) % index
-	} else if len(rangeParts) == 2 {
-		start, err := strconv.Atoi(rangeParts[0])
-		if err != nil {
-			handleFatalError("Invalid Redis Indices configuration", err)
-		}
-		end, err := strconv.Atoi(rangeParts[1])
-		if err != nil {
-			handleFatalError("Invalid Redis Indices configuration", err)
-		}
-		shardRange := end - start + 1
-		if shardRange == 0 {
-			handleFatalError("Invalid Redis Indices configuration: range results in zero", nil)
-		}
-		return int(sha256.Sum256([]byte(uuid))[0]) % shardRange
-	} else {
-		handleFatalError("Invalid Redis Indices format. Use a single number or a range (e.g., '0-2')", nil)
+
+	// Use last 8 hex chars (4 bytes) of UUID for good distribution
+	// UUIDs are designed to be random, so this provides excellent distribution
+	cleaned := strings.ReplaceAll(uuid, "-", "")
+	if len(cleaned) < 8 {
+		// Fallback for malformed UUIDs
+		return shardConfig.startIndex
 	}
-	return 0
+	
+	lastBytes := cleaned[len(cleaned)-8:] // Last 4 bytes as hex string
+	
+	// Convert hex to uint32 for modulo operation
+	hash, err := strconv.ParseUint(lastBytes, 16, 32)
+	if err != nil {
+		// Fallback for parse errors
+		return shardConfig.startIndex
+	}
+	
+	shardOffset := int(hash) % shardConfig.shardCount
+	return shardConfig.startIndex + shardOffset
 }
 
 // saveOTPToRedis saves the OTP data to Redis under the appropriate shard
