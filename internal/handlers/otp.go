@@ -339,6 +339,6 @@ func (h *OTPHandler) Health(c *gin.Context) {
 
 // Metrics handles the metrics endpoint
 func (h *OTPHandler) Metrics(c *gin.Context) {
-	stats := h.metrics.GetStats()
+	stats := h.metrics.GetStatsMap()
 	h.sendAPIResponse(c, http.StatusOK, "METRICS", stats)
 }

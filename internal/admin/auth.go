@@ -249,24 +249,36 @@ func (am *AuthManager) verifyToken(c *gin.Context) {
 // Helper methods
 
 func (am *AuthManager) extractToken(c *gin.Context) string {
-	// Check Authorization header
+	// Check Authorization header with length validation
 	authHeader := c.GetHeader("Authorization")
 	if authHeader != "" {
-		parts := strings.Split(authHeader, " ")
-		if len(parts) == 2 && parts[0] == "Bearer" {
-			return parts[1]
+		// Prevent DoS attacks by limiting header length
+		const maxHeaderLength = 1024
+		if len(authHeader) > maxHeaderLength {
+			am.logger.WithField("header_length", len(authHeader)).Warn("Authorization header too long, potential DoS attempt")
+			return ""
+		}
+		
+		// Use safer parsing instead of strings.Split to prevent excessive memory allocation
+		const bearerPrefix = "Bearer "
+		if len(authHeader) > len(bearerPrefix) && authHeader[:len(bearerPrefix)] == bearerPrefix {
+			token := strings.TrimSpace(authHeader[len(bearerPrefix):])
+			// Additional validation on token format to prevent further abuse
+			if len(token) > 0 && len(token) <= 512 && !strings.Contains(token, " ") {
+				return token
+			}
 		}
 	}
 	
-	// Check query parameter
+	// Check query parameter with validation
 	token := c.Query("token")
-	if token != "" {
+	if token != "" && len(token) <= 512 && !strings.Contains(token, " ") {
 		return token
 	}
 	
-	// Check cookie
+	// Check cookie with validation
 	cookie, err := c.Cookie("admin_token")
-	if err == nil {
+	if err == nil && len(cookie) <= 512 && !strings.Contains(cookie, " ") {
 		return cookie
 	}
 	
@@ -274,19 +286,71 @@ func (am *AuthManager) extractToken(c *gin.Context) string {
 }
 
 func (am *AuthManager) validateToken(tokenString string) (*AdminClaims, error) {
+	// Additional input validation to prevent abuse
+	if len(tokenString) == 0 {
+		return nil, errors.New("empty token")
+	}
+	
+	if len(tokenString) > 512 {
+		am.logger.WithField("token_length", len(tokenString)).Warn("JWT token too long, potential DoS attempt")
+		return nil, errors.New("token too long")
+	}
+	
 	token, err := jwt.ParseWithClaims(tokenString, &AdminClaims{}, func(token *jwt.Token) (interface{}, error) {
+		// Validate the signing method to prevent algorithm confusion attacks
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("unexpected signing method")
+		}
 		return am.jwtSecret, nil
 	})
 	
+	// Critical security fix: Handle errors properly according to JWT security advisory
+	// Do not accept tokens with signature validation errors, even if other validations pass
 	if err != nil {
-		return nil, err
+		// Log the specific error for debugging but don't expose it
+		am.logger.WithError(err).Warn("JWT validation failed")
+		
+		// Check for specific error types to provide appropriate responses
+		if errors.Is(err, jwt.ErrTokenExpired) {
+			return nil, errors.New("token expired")
+		}
+		if errors.Is(err, jwt.ErrTokenNotValidYet) {
+			return nil, errors.New("token not valid yet")
+		}
+		if errors.Is(err, jwt.ErrTokenMalformed) {
+			return nil, errors.New("token malformed")
+		}
+		
+		// For any other error (including signature validation failures), 
+		// return generic invalid token error to prevent information leakage
+		return nil, errors.New("invalid token")
 	}
 	
-	if claims, ok := token.Claims.(*AdminClaims); ok && token.Valid {
-		return claims, nil
+	// Additional validation: ensure token is valid and claims are correct type
+	claims, ok := token.Claims.(*AdminClaims)
+	if !ok {
+		return nil, errors.New("invalid token claims")
 	}
 	
-	return nil, errors.New("invalid token")
+	if !token.Valid {
+		return nil, errors.New("invalid token")
+	}
+	
+	// Additional claims validation
+	if claims.Username == "" {
+		return nil, errors.New("invalid token: missing username")
+	}
+	
+	if claims.Role == "" {
+		return nil, errors.New("invalid token: missing role")
+	}
+	
+	// Validate issuer if present
+	if claims.Issuer != "" && claims.Issuer != "otp-service-admin" {
+		return nil, errors.New("invalid token: incorrect issuer")
+	}
+	
+	return claims, nil
 }
 
 func (am *AuthManager) verifyCredentials(username, password string) bool {
