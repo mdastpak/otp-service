@@ -388,30 +388,6 @@ func delOTPFromRedis(uuid string) error {
 	return nil
 }
 
-// healthCheckMiddleware is a middleware that checks the health of Redis before processing each request
-func healthCheckMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		healthCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
-		defer cancel()
-
-		// Check Redis health before processing request
-		if _, err := redisClient.Ping(healthCtx).Result(); err != nil {
-			// Prepare response data with sensitive config masking
-			responseData := map[string]interface{}{
-				"redis_status": "Unavailable",
-				"config":       "***********",
-			}
-			if cfg.Server.Mode == "debug" {
-				responseData["config"] = cfg
-			}
-
-			sendAPIResponse(c, http.StatusServiceUnavailable, StatusServiceHealth, responseData)
-			c.Abort()
-			return
-		}
-		c.Next()
-	}
-}
 
 // generateOTPHandler handles the POST request to generate an OTP
 func generateOTPHandler(c *gin.Context) {
