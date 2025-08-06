@@ -635,9 +635,10 @@ func main() {
 	// Set up Gin router with CORS
 	gin.SetMode(gin.ReleaseMode)
 
-	if cfg.Server.Mode == "debug" {
+	switch cfg.Server.Mode {
+	case "debug":
 		gin.SetMode(gin.DebugMode)
-	} else if cfg.Server.Mode == "test" {
+	case "test":
 		gin.SetMode(gin.TestMode)
 	}
 
