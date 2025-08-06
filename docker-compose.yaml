@@ -19,6 +19,12 @@ services:
       - SERVER_PORT=8080
       - SERVER_MODE=test
       - HASH_KEYS=true
+      # Admin configuration for Docker
+      - ADMIN_ENABLED=true
+      - ADMIN_JWT_SECRET=docker-dev-jwt-secret-change-in-production
+      - ADMIN_BASIC_AUTH=false
+      - ADMIN_REQUIRE_AUTH=false  # Disable auth in Docker test mode
+      - ADMIN_ALLOWED_IPS=127.0.0.1,::1,172.20.0.1
     depends_on:
       redis:
         condition: service_healthy

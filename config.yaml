@@ -28,7 +28,7 @@ config:
 admin:
   enabled: true
   jwt_secret: "your-super-secret-jwt-key-change-in-production"
-  allowed_ips: ["127.0.0.1", "::1"]  # Add your allowed IPs here
+  allowed_ips: ["127.0.0.1", "::1", "172.20.0.1"]  # Include Docker network gateway IP
   basic_auth: false    # Use JWT auth instead of basic auth
   require_auth: true   # Set to false for development (NOT recommended for production)
 

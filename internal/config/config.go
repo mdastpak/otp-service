@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strings"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -35,6 +36,13 @@ type Config struct {
 	Config struct {
 		HashKeys bool `mapstructure:"hash_keys"`
 	} `mapstructure:"config"`
+	Admin struct {
+		Enabled     bool     `mapstructure:"enabled"`
+		JWTSecret   string   `mapstructure:"jwt_secret"`
+		AllowedIPs  []string `mapstructure:"allowed_ips"`
+		BasicAuth   bool     `mapstructure:"basic_auth"`
+		RequireAuth bool     `mapstructure:"require_auth"`
+	} `mapstructure:"admin"`
 }
 
 // LoadConfig reads the configuration from the config file and environment variables
@@ -59,10 +67,26 @@ func LoadConfig() (*Config, error) {
 	viper.BindEnv("server.port", "SERVER_PORT")
 	viper.BindEnv("server.mode", "SERVER_MODE")
 	viper.BindEnv("config.hash_keys", "HASH_KEYS")
+	// Admin configuration environment variables
+	viper.BindEnv("admin.enabled", "ADMIN_ENABLED")
+	viper.BindEnv("admin.jwt_secret", "ADMIN_JWT_SECRET")
+	viper.BindEnv("admin.allowed_ips", "ADMIN_ALLOWED_IPS")
+	viper.BindEnv("admin.basic_auth", "ADMIN_BASIC_AUTH")
+	viper.BindEnv("admin.require_auth", "ADMIN_REQUIRE_AUTH")
 
 	var config Config
 	if err := viper.Unmarshal(&config); err != nil {
 		return nil, err
+	}
+
+	// Handle comma-separated admin allowed IPs from environment variable
+	if adminAllowedIPs := viper.GetString("admin.allowed_ips"); adminAllowedIPs != "" && len(config.Admin.AllowedIPs) == 0 {
+		// Split comma-separated string and trim spaces
+		ips := strings.Split(adminAllowedIPs, ",")
+		for i, ip := range ips {
+			ips[i] = strings.TrimSpace(ip)
+		}
+		config.Admin.AllowedIPs = ips
 	}
 
 	return &config, nil

@@ -873,6 +873,10 @@ func main() {
 	logger.Info("")
 	logger.Info("⚙️  Configuration:")
 	logger.Infof("   ├─ Server Mode: %s", cfg.Server.Mode)
+	if cfg.Server.Mode == "test" {
+		logger.Infof("   ├─ Admin Auth Required: %v", cfg.Admin.RequireAuth)
+		logger.Infof("   ├─ Admin IPs: %v", cfg.Admin.AllowedIPs)
+	}
 	logger.Infof("   ├─ Redis: %s:%s", cfg.Redis.Host, cfg.Redis.Port)
 	if cfg.Redis.Indices != "" {
 		logger.Infof("   ├─ Redis Sharding: %s", cfg.Redis.Indices)

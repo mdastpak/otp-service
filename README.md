@@ -408,6 +408,24 @@ admin:
   require_auth: true               # Enable authentication
 ```
 
+#### **Docker Environment Variables**
+
+For Docker deployments, use environment variables to override config:
+
+```bash
+# Admin configuration
+ADMIN_ENABLED=true
+ADMIN_JWT_SECRET=your-jwt-secret
+ADMIN_ALLOWED_IPS=127.0.0.1,::1,172.20.0.1  # Comma-separated IPs
+ADMIN_BASIC_AUTH=false
+ADMIN_REQUIRE_AUTH=false  # Set to false for development/test mode
+
+# Server configuration
+SERVER_MODE=test  # Enables test mode bypass for development
+```
+
+**Docker Compose Note**: When using Docker Compose, the client IP appears as the Docker network gateway (e.g., `172.20.0.1`). The service automatically includes common Docker network IPs in the whitelist when running in test mode.
+
 ### 🔧 **Technical Features**
 
 #### **WebSocket Integration**
