@@ -157,7 +157,8 @@ func (c *Client) getShardIndex(uuid string) int {
 		return c.shardConfig.startIndex
 	}
 	
-	shardOffset := int(hash) % c.shardConfig.shardCount
+	// Safe conversion: hash is guaranteed to fit in uint32, then convert to int
+	shardOffset := int(uint32(hash)) % c.shardConfig.shardCount
 	return c.shardConfig.startIndex + shardOffset
 }
 
