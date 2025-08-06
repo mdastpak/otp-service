@@ -675,9 +675,10 @@ func main() {
 			"config":       "***********",
 			"server_mode":  cfg.Server.Mode,
 		}
-		if cfg.Server.Mode == "debug" {
+		switch cfg.Server.Mode {
+		case "debug":
 			responseData["config"] = cfg
-		} else if cfg.Server.Mode == "test" {
+		case "test":
 			responseData["test_mode"] = true
 			responseData["debug_features"] = map[string]interface{}{
 				"otp_visible_in_generation": true,
