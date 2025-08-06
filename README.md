@@ -529,6 +529,7 @@ The OTP service follows a strategic 5-phase development roadmap designed to evol
 - **[ROADMAP.md](ROADMAP.md)** - Complete development roadmap, feature planning, and project vision
 - **[TESTING.md](TESTING.md)** - Comprehensive testing documentation, test suite overview, and quality assessment
 - **[SECURITY.md](SECURITY.md)** - Security policy, vulnerability reporting, and security best practices
+- **[WORKFLOW.md](WORKFLOW.md)** - Git workflow, branching strategy, and development process guidelines
 
 ---
 
