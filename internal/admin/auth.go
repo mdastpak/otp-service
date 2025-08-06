@@ -74,12 +74,47 @@ func (am *AuthManager) BasicAuthMiddleware() gin.HandlerFunc {
 }
 
 // JWTAuthMiddleware provides JWT-based authentication
-func (am *AuthManager) JWTAuthMiddleware() gin.HandlerFunc {
+func (am *AuthManager) JWTAuthMiddleware(serverMode string) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
+		clientIP := c.ClientIP()
+		userAgent := c.GetHeader("User-Agent")
+		requestURI := c.Request.RequestURI
+		method := c.Request.Method
+		
+		// Bypass JWT validation in test mode
+		if serverMode == "test" {
+			am.logger.WithFields(logrus.Fields{
+				"ip":           clientIP,
+				"user_agent":   userAgent,
+				"request_uri":  requestURI,
+				"method":       method,
+				"mode":         "test",
+			}).Info("Admin JWT auth bypassed in test mode")
+			
+			// Set default admin context in test mode
+			c.Set("admin_user", "test_admin")
+			c.Set("admin_role", "admin")
+			c.Next()
+			return
+		}
+		
 		tokenString := am.extractToken(c)
 		if tokenString == "" {
+			am.logger.WithFields(logrus.Fields{
+				"ip":           clientIP,
+				"user_agent":   userAgent,
+				"request_uri":  requestURI,
+				"method":       method,
+				"error":        "missing_token",
+			}).Warn("Admin JWT auth failed: missing token")
+			
 			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "Authorization token required",
+				"error":        "Authorization token required",
+				"requested_ip": clientIP,
+				"user_agent":   userAgent,
+				"request_uri":  requestURI,
+				"method":       method,
+				"timestamp":    time.Now().UTC().Format(time.RFC3339),
 			})
 			c.Abort()
 			return
@@ -87,13 +122,34 @@ func (am *AuthManager) JWTAuthMiddleware() gin.HandlerFunc {
 
 		claims, err := am.validateToken(tokenString)
 		if err != nil {
-			am.logger.WithError(err).Warn("Invalid admin token")
+			am.logger.WithFields(logrus.Fields{
+				"ip":           clientIP,
+				"user_agent":   userAgent,
+				"request_uri":  requestURI,
+				"method":       method,
+				"error":        err.Error(),
+			}).Warn("Admin JWT auth failed: invalid token")
+			
 			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "Invalid or expired token",
+				"error":        "Invalid or expired token",
+				"requested_ip": clientIP,
+				"user_agent":   userAgent,
+				"request_uri":  requestURI,
+				"method":       method,
+				"timestamp":    time.Now().UTC().Format(time.RFC3339),
 			})
 			c.Abort()
 			return
 		}
+
+		am.logger.WithFields(logrus.Fields{
+			"ip":           clientIP,
+			"user_agent":   userAgent,
+			"request_uri":  requestURI,
+			"method":       method,
+			"admin_user":   claims.Username,
+			"admin_role":   claims.Role,
+		}).Info("Admin JWT auth successful")
 
 		// Store user info in context
 		c.Set("admin_user", claims.Username)
@@ -103,7 +159,7 @@ func (am *AuthManager) JWTAuthMiddleware() gin.HandlerFunc {
 }
 
 // IPWhitelistMiddleware restricts access to specific IP addresses
-func (am *AuthManager) IPWhitelistMiddleware(allowedIPs []string) gin.HandlerFunc {
+func (am *AuthManager) IPWhitelistMiddleware(allowedIPs []string, serverMode string) gin.HandlerFunc {
 	allowedIPMap := make(map[string]bool)
 	for _, ip := range allowedIPs {
 		allowedIPMap[ip] = true
@@ -111,16 +167,52 @@ func (am *AuthManager) IPWhitelistMiddleware(allowedIPs []string) gin.HandlerFun
 	
 	return gin.HandlerFunc(func(c *gin.Context) {
 		clientIP := c.ClientIP()
+		userAgent := c.GetHeader("User-Agent")
+		requestURI := c.Request.RequestURI
+		method := c.Request.Method
 		
-		// Allow localhost and whitelisted IPs
-		if clientIP == "127.0.0.1" || clientIP == "::1" || allowedIPMap[clientIP] {
+		// Bypass IP validation in test mode
+		if serverMode == "test" {
+			am.logger.WithFields(logrus.Fields{
+				"ip":           clientIP,
+				"user_agent":   userAgent,
+				"request_uri":  requestURI,
+				"method":       method,
+				"mode":         "test",
+			}).Info("Admin access allowed: IP validation bypassed in test mode")
 			c.Next()
 			return
 		}
 		
-		am.logger.WithField("ip", clientIP).Warn("Admin access denied: IP not whitelisted")
+		// Allow localhost and whitelisted IPs
+		if clientIP == "127.0.0.1" || clientIP == "::1" || allowedIPMap[clientIP] {
+			am.logger.WithFields(logrus.Fields{
+				"ip":           clientIP,
+				"user_agent":   userAgent,
+				"request_uri":  requestURI,
+				"method":       method,
+				"authorized":   true,
+			}).Info("Admin access granted: IP authorized")
+			c.Next()
+			return
+		}
+		
+		am.logger.WithFields(logrus.Fields{
+			"ip":           clientIP,
+			"user_agent":   userAgent,
+			"request_uri":  requestURI,
+			"method":       method,
+			"allowed_ips":  allowedIPs,
+			"authorized":   false,
+		}).Warn("Admin access denied: IP not whitelisted")
+		
 		c.JSON(http.StatusForbidden, gin.H{
-			"error": "Access denied: IP not authorized",
+			"error":        "Access denied: IP not authorized",
+			"requested_ip": clientIP,
+			"user_agent":   userAgent,
+			"request_uri":  requestURI,
+			"method":       method,
+			"timestamp":    time.Now().UTC().Format(time.RFC3339),
 		})
 		c.Abort()
 	})

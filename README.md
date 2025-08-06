@@ -425,6 +425,30 @@ admin:
 - Minimal resource overhead
 - Caching for frequently accessed data
 
+#### **Enhanced Startup Logging**
+The service now provides comprehensive startup information displayed when launching:
+- **Admin dashboard URLs**: Exact paths to dashboard and login pages
+- **Available features**: Real-time analytics, charts, activity feed, health monitoring
+- **Security configuration**: Authentication method, IP whitelist, rate limiting status
+- **Server configuration**: Mode, Redis connection, TLS status, security headers
+- **Default credentials**: Displayed with security warnings for production use
+
+Example startup output:
+```
+🎛️  Admin Dashboard:
+   ├─ Dashboard: http://localhost:8080/admin/
+   ├─ Login:     http://localhost:8080/admin/login
+   ├─ Features:
+   │  ├─ 📊 Real-time Analytics
+   │  ├─ 📈 Interactive Charts
+   │  ├─ 📋 Live Activity Feed
+   │  └─ 🔍 System Health Monitoring
+   └─ Security:
+      ├─ 🔐 JWT Authentication Enabled
+      ├─ 🛡️  IP Whitelist: [127.0.0.1 ::1]
+      └─ 🚦 Rate Limiting Enabled
+```
+
 ### 📋 **API Endpoints**
 
 The dashboard provides RESTful APIs for programmatic access:
@@ -444,6 +468,22 @@ The dashboard provides RESTful APIs for programmatic access:
 - **Secure WebSocket connections** with authentication
 - **CSRF protection** for all API endpoints
 - **Input validation** and sanitization
+- **Enhanced access logging** with detailed request information
+- **Test mode bypass** for development and testing
+
+#### **Enhanced Security Logging**
+The admin panel now provides comprehensive access logging with detailed information:
+- **IP address tracking**: Client IP with User-Agent details
+- **Request metadata**: URI, method, and timestamp
+- **Authorization status**: Success/failure with detailed context
+- **Rate limiting events**: Comprehensive rate limit monitoring
+
+#### **Test Mode Features**
+When `server.mode = "test"` in configuration:
+- **IP validation bypass**: Allows access from any IP address
+- **Authentication bypass**: Skips JWT validation with test admin context
+- **Enhanced logging**: Shows bypass events with full request details
+- **Development convenience**: Simplifies testing and development workflows
 
 **⚠️ Production Security Notes:**
 - Change default credentials immediately
@@ -451,6 +491,7 @@ The dashboard provides RESTful APIs for programmatic access:
 - Configure IP whitelisting appropriately
 - Enable HTTPS in production
 - Consider placing behind a reverse proxy
+- **Never use test mode in production environments**
 
 ## Development Roadmap
 

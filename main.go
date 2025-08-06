@@ -221,6 +221,7 @@ func init() {
 		AllowedIPs:  cfg.Admin.AllowedIPs,
 		BasicAuth:   cfg.Admin.BasicAuth,
 		RequireAuth: cfg.Admin.RequireAuth,
+		ServerMode:  cfg.Server.Mode,
 	}
 	adminIntegration = admin.NewAdminIntegration(metricsService, logger, adminConfig)
 

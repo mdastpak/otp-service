@@ -20,6 +20,7 @@ type Config struct {
 	AllowedIPs  []string `mapstructure:"allowed_ips"`
 	BasicAuth   bool     `mapstructure:"basic_auth"`
 	RequireAuth bool     `mapstructure:"require_auth"`
+	ServerMode  string   // Pass server mode for test mode bypassing
 }
 
 // NewAdminIntegration creates a new admin integration instance
@@ -55,7 +56,7 @@ func (ai *AdminIntegration) SetupAdminRoutes(router *gin.Engine, config Config) 
 
 	// Apply security middlewares
 	if len(config.AllowedIPs) > 0 {
-		adminGroup.Use(ai.authManager.IPWhitelistMiddleware(config.AllowedIPs))
+		adminGroup.Use(ai.authManager.IPWhitelistMiddleware(config.AllowedIPs, config.ServerMode))
 	}
 
 	// Apply rate limiting
@@ -77,7 +78,7 @@ func (ai *AdminIntegration) SetupAdminRoutes(router *gin.Engine, config Config) 
 			protectedGroup = adminGroup.Group("/", ai.authManager.BasicAuthMiddleware())
 		} else {
 			// Use JWT authentication
-			protectedGroup = adminGroup.Group("/", ai.authManager.JWTAuthMiddleware())
+			protectedGroup = adminGroup.Group("/", ai.authManager.JWTAuthMiddleware(config.ServerMode))
 		}
 	} else {
 		// No authentication required (development only)

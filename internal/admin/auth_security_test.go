@@ -20,7 +20,7 @@ func TestSecurityVulnerabilities(t *testing.T) {
 	t.Run("DoS Protection - Long Authorization Header", func(t *testing.T) {
 		gin.SetMode(gin.TestMode)
 		router := gin.New()
-		router.Use(authManager.JWTAuthMiddleware())
+		router.Use(authManager.JWTAuthMiddleware("release"))
 		router.GET("/test", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"message": "success"})
 		})
@@ -42,7 +42,7 @@ func TestSecurityVulnerabilities(t *testing.T) {
 	t.Run("DoS Protection - Many Spaces in Header", func(t *testing.T) {
 		gin.SetMode(gin.TestMode)
 		router := gin.New()
-		router.Use(authManager.JWTAuthMiddleware())
+		router.Use(authManager.JWTAuthMiddleware("release"))
 		router.GET("/test", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"message": "success"})
 		})
