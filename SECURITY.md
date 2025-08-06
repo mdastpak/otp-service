@@ -143,6 +143,11 @@ For security-related questions or concerns:
 - Contact project maintainers through secure channels
 - Follow responsible disclosure practices
 
+## Related Documentation
+
+- **[README.md](README.md)** - API documentation, deployment guide, and technical architecture
+- **[TESTING.md](TESTING.md)** - Test suite documentation and quality assessment
+
 ---
 
 **Last Updated**: December 2024  

@@ -13,7 +13,10 @@ This README provides details on the API endpoints, input parameters, expected re
 - [Request Parameters](#request-parameters)
 - [Response Structure](#response-structure)
 - [Status Code Guide](#status-code-guide)
+- [Additional Notes](#additional-notes)
 - [Redis Configuration](#redis-configuration)
+- [Technical Architecture](#technical-architecture)
+- [Related Documentation](#related-documentation)
 
 ## Performance Improvements
 
@@ -342,6 +345,11 @@ The OTP service has undergone significant architectural improvements to enhance 
 - **Security Patches**: Proactive security monitoring and rapid vulnerability remediation
 
 These improvements make the OTP service more robust, performant, and ready for production workloads at scale.
+
+## Related Documentation
+
+- **[TESTING.md](TESTING.md)** - Comprehensive testing documentation, test suite overview, and quality assessment
+- **[SECURITY.md](SECURITY.md)** - Security policy, vulnerability reporting, and security best practices
 
 ---
 

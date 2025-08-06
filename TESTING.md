@@ -273,6 +273,11 @@ The OTP service has a **production-ready test suite** with:
 **Confidence Level**: ✅ High - All tests properly structured and maintained  
 **Maintainability**: ✅ Excellent - Modular, well-organized, and documented
 
+## Related Documentation
+
+- **[README.md](README.md)** - API documentation, configuration, and usage examples
+- **[SECURITY.md](SECURITY.md)** - Security policy and vulnerability reporting guidelines
+
 ---
 
 **Total Test Coverage**: 39 tests + 8 benchmarks across 6 files  
