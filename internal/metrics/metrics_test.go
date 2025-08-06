@@ -87,12 +87,11 @@ func TestGetStats(t *testing.T) {
 
 	stats := m.GetStats()
 
-	assert.Equal(t, int64(1), stats["otp_generated"])
-	assert.Equal(t, int64(1), stats["otp_verified"])
-	assert.Equal(t, int64(1), stats["otp_expired"])
-	assert.Equal(t, int64(2), stats["total_requests"])
-	assert.Contains(t, stats, "uptime_seconds")
-	assert.Contains(t, stats, "start_time")
+	assert.Equal(t, int64(1), stats.OTPGenerated)
+	assert.Equal(t, int64(1), stats.OTPVerified)
+	assert.Equal(t, int64(1), stats.OTPExpired)
+	assert.Equal(t, int64(2), stats.TotalRequests)
+	assert.NotZero(t, stats.StartTime)
 }
 
 func TestConcurrentIncrements(t *testing.T) {
@@ -152,8 +151,7 @@ func TestUptime(t *testing.T) {
 	// Sleep briefly to ensure uptime > 0
 	time.Sleep(10 * time.Millisecond)
 
-	stats := m.GetStats()
-	uptime := stats["uptime_seconds"].(int64)
+	uptime := m.GetUptime()
 
 	assert.True(t, uptime >= 0)
 }
