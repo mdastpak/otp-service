@@ -336,6 +336,11 @@ The OTP service has undergone significant architectural improvements to enhance 
 - **Load Distribution**: Even distribution across all configured Redis databases
 - **Resource Optimization**: Reduced CPU usage for high-throughput scenarios
 
+#### 🔒 **Security Enhancements**
+- **Dependency Updates**: Updated to latest secure versions of golang.org/x/net and golang.org/x/crypto
+- **Vulnerability Fixes**: Addressed IPv6 Zone ID HTTP Proxy Bypass, XSS, DoS, and authorization bypass vulnerabilities
+- **Security Patches**: Proactive security monitoring and rapid vulnerability remediation
+
 These improvements make the OTP service more robust, performant, and ready for production workloads at scale.
 
 ---
