@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 
 	"otp-service/internal/config"
@@ -35,7 +35,7 @@ func NewClient(cfg *config.Config, logger *logrus.Logger) (*Client, error) {
 		MinIdleConns: 5,
 		MaxRetries:   3,
 		DialTimeout:  time.Duration(cfg.Redis.Timeout) * time.Second,
-		IdleTimeout:  5 * time.Minute,
+		ConnMaxIdleTime: 5 * time.Minute,
 	})
 
 	ctx := context.Background()
