@@ -125,7 +125,6 @@ func LoadConfig() (*Config, error) {
 			logger.Warn("🚨 This is for development only - never use in production!")
 		}
 	}
-
 	// Debug logging for admin configuration in non-release mode
 	if config.Server.Mode != "release" {
 		// This helps debug environment variable loading
