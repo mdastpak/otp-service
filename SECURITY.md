@@ -146,6 +146,7 @@ For security-related questions or concerns:
 ## Related Documentation
 
 - **[README.md](README.md)** - API documentation, deployment guide, and technical architecture
+- **[ROADMAP.md](ROADMAP.md)** - Development roadmap including future security enhancements
 - **[TESTING.md](TESTING.md)** - Test suite documentation and quality assessment
 
 ---

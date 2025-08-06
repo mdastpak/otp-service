@@ -16,6 +16,7 @@ This README provides details on the API endpoints, input parameters, expected re
 - [Additional Notes](#additional-notes)
 - [Redis Configuration](#redis-configuration)
 - [Technical Architecture](#technical-architecture)
+- [Development Roadmap](#development-roadmap)
 - [Related Documentation](#related-documentation)
 
 ## Performance Improvements
@@ -346,8 +347,40 @@ The OTP service has undergone significant architectural improvements to enhance 
 
 These improvements make the OTP service more robust, performant, and ready for production workloads at scale.
 
+## Development Roadmap
+
+The OTP service follows a strategic 5-phase development roadmap designed to evolve from a solid foundation into a comprehensive, enterprise-grade authentication platform:
+
+### **Phase 1: Core Foundation** ✅ **COMPLETED**
+- Production-ready OTP generation and verification
+- Comprehensive testing and security measures
+- Performance-optimized UUID-based sharding
+
+### **Phase 2: Enhanced Observability & Security** 🔄 **IN PROGRESS**
+- OpenTelemetry tracing and Prometheus metrics
+- Advanced security features and audit logging
+- Enhanced monitoring and health checks
+
+### **Phase 3: Scalability & Multi-Region** 📈 **PLANNED** 
+- Redis Cluster support for horizontal scaling
+- Multi-region deployment capabilities
+- High availability and resilience patterns
+
+### **Phase 4: Enterprise Features** 🚀 **FUTURE**
+- Multi-tenant architecture and compliance
+- Advanced API capabilities (GraphQL, gRPC)
+- Admin dashboard and white-label solutions
+
+### **Phase 5: AI/ML Integration** 🤖 **VISIONARY**
+- Intelligent fraud detection and optimization
+- Predictive analytics and scaling
+- Next-generation protocol support
+
+**📋 Full Details**: See **[ROADMAP.md](ROADMAP.md)** for complete feature specifications, timelines, and technical architecture evolution plans.
+
 ## Related Documentation
 
+- **[ROADMAP.md](ROADMAP.md)** - Complete development roadmap, feature planning, and project vision
 - **[TESTING.md](TESTING.md)** - Comprehensive testing documentation, test suite overview, and quality assessment
 - **[SECURITY.md](SECURITY.md)** - Security policy, vulnerability reporting, and security best practices
 
