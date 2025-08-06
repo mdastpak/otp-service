@@ -2,6 +2,7 @@ package config
 
 import (
 	"strings"
+	"strconv"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -87,6 +88,36 @@ func LoadConfig() (*Config, error) {
 			ips[i] = strings.TrimSpace(ip)
 		}
 		config.Admin.AllowedIPs = ips
+	}
+
+	// Handle boolean environment variables explicitly (Docker passes them as strings)
+	if requireAuthStr := viper.GetString("admin.require_auth"); requireAuthStr != "" {
+		if requireAuth, err := strconv.ParseBool(requireAuthStr); err == nil {
+			config.Admin.RequireAuth = requireAuth
+		}
+	}
+	
+	if basicAuthStr := viper.GetString("admin.basic_auth"); basicAuthStr != "" {
+		if basicAuth, err := strconv.ParseBool(basicAuthStr); err == nil {
+			config.Admin.BasicAuth = basicAuth
+		}
+	}
+	
+	if enabledStr := viper.GetString("admin.enabled"); enabledStr != "" {
+		if enabled, err := strconv.ParseBool(enabledStr); err == nil {
+			config.Admin.Enabled = enabled
+		}
+	}
+
+	// Debug logging for admin configuration in non-release mode
+	if config.Server.Mode != "release" {
+		// This helps debug environment variable loading
+		logger := logrus.New()
+		logger.SetLevel(logrus.DebugLevel)
+		logger.Debugf("DEBUG Config - Admin.RequireAuth from config: %v", config.Admin.RequireAuth)
+		logger.Debugf("DEBUG Config - ADMIN_REQUIRE_AUTH env var: %s", viper.GetString("admin.require_auth"))
+		logger.Debugf("DEBUG Config - Admin.Enabled: %v", config.Admin.Enabled)
+		logger.Debugf("DEBUG Config - Admin.AllowedIPs: %v", config.Admin.AllowedIPs)
 	}
 
 	return &config, nil
