@@ -367,15 +367,17 @@ func getShardIndex(uuid string) int {
 	
 	lastBytes := cleaned[len(cleaned)-8:] // Last 4 bytes as hex string
 	
-	// Convert hex to uint32 for modulo operation
+	// Convert hex to int32 for modulo operation, with bounds check
 	hash, err := strconv.ParseUint(lastBytes, 16, 32)
 	if err != nil {
 		// Fallback for parse errors
 		return shardConfig.startIndex
 	}
-	
-	// Safe conversion: hash is guaranteed to fit in uint32, then convert to int
-	shardOffset := int(uint32(hash)) % shardConfig.shardCount
+	if hash > uint64(math.MaxInt32) {
+		// Fallback for out-of-bounds values
+		return shardConfig.startIndex
+	}
+	shardOffset := int(int32(hash)) % shardConfig.shardCount
 	return shardConfig.startIndex + shardOffset
 }
 
