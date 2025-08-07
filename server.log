@@ -1,0 +1,48 @@
+{"level":"info","msg":"Connected to Redis successfully","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","mode":"test","msg":"🔧 Test mode admin credentials generated","password":"c2c2abe6c0283a7b","time":"2025-08-07T08:48:12+03:30","username":"admin_e64d98f6"}
+{"level":"info","msg":"Setting up admin dashboard routes","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"Admin dashboard available at /admin/ (redirects to /admin/dashboard)","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"Admin login available at /admin/login","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"==========================================","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"🔐 OTP Service - Production Ready","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"==========================================","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"📡 Server URL: http://localhost:8080","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"📋 Available Endpoints:","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"   ├─ POST http://localhost:8080/          - Generate OTP","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"   ├─ GET  http://localhost:8080/?uuid=...  - Verify OTP","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"   ├─ GET  http://localhost:8080/health     - Health Check","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"   └─ GET  http://localhost:8080/metrics    - System Metrics","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"🎛️  Admin Dashboard:","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"   ├─ Dashboard: http://localhost:8080/admin/","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"   ├─ Login:     http://localhost:8080/admin/login","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"   ├─ Features:","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"   │  ├─ 📊 Real-time Analytics","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"   │  ├─ 📈 Interactive Charts","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"   │  ├─ 📋 Live Activity Feed","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"   │  └─ 🔍 System Health Monitoring","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"   └─ Security:","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"      ├─ 🔐 JWT Authentication Enabled","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"      ├─ 🛡️  IP Whitelist: [127.0.0.1 ::1 172.20.0.1]","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"      └─ 🚦 Rate Limiting Enabled","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"","time":"2025-08-07T08:48:12+03:30"}
+{"level":"warning","msg":"🔑 Using Default Admin Credentials - CHANGE IN PRODUCTION!","time":"2025-08-07T08:48:12+03:30"}
+{"level":"warning","msg":"   └─ Review admin configuration in production deployments","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"⚙️  Configuration:","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"   ├─ Server Mode: test","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"   ├─ Admin Auth Required: true","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"   ├─ Admin IPs: [127.0.0.1 ::1 172.20.0.1]","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"   ├─ Redis: localhost:6380","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"   ├─ Redis Sharding: 0-5","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"   ├─ Key Hashing: true","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"   ├─ TLS/SSL: ❌ Disabled","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"   └─ Security Headers: ✅ Enabled","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"🚀 Server Starting...","time":"2025-08-07T08:48:12+03:30"}
+{"level":"info","msg":"==========================================","time":"2025-08-07T08:48:12+03:30"}
+{"authorized":true,"ip":"127.0.0.1","level":"info","method":"GET","msg":"Admin access granted: IP authorized","request_uri":"/admin/dashboard/","time":"2025-08-07T08:48:21+03:30","user_agent":"curl/8.7.1"}
+{"authorized":true,"ip":"127.0.0.1","level":"info","method":"HEAD","msg":"Admin access granted: IP authorized","request_uri":"/admin/dashboard/static/css/dashboard.css","time":"2025-08-07T08:48:26+03:30","user_agent":"curl/8.7.1"}
+{"authorized":true,"ip":"127.0.0.1","level":"info","method":"GET","msg":"Admin access granted: IP authorized","request_uri":"/admin/dashboard/static/js/dashboard.js","time":"2025-08-07T08:48:31+03:30","user_agent":"curl/8.7.1"}
+{"level":"info","msg":"Shutting down server...","time":"2025-08-07T08:48:42+03:30"}

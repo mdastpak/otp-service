@@ -1,0 +1,22 @@
+time="2025-08-07T08:46:20+03:30" level=info msg="🔧 Test mode admin credentials generated" mode=test password=b6e371fd80b97979 username=admin_7e491871
+time="2025-08-07T08:46:20+03:30" level=info msg="Setting up admin dashboard routes"
+time="2025-08-07T08:46:20+03:30" level=info msg="Admin dashboard available at /admin/ (redirects to /admin/dashboard)"
+time="2025-08-07T08:46:20+03:30" level=info msg="Admin login available at /admin/login"
+2025/08/07 08:46:20 Starting test server on :8081...
+2025/08/07 08:46:20 Test routes:
+2025/08/07 08:46:20   - GET http://localhost:8081/test
+2025/08/07 08:46:20   - GET http://localhost:8081/admin/dashboard/
+2025/08/07 08:46:20   - GET http://localhost:8081/admin/login
+panic: runtime error: invalid memory address or nil pointer dereference
+[signal SIGSEGV: segmentation violation code=0x2 addr=0x0 pc=0x102db964c]
+
+goroutine 32 [running]:
+otp-service/internal/metrics.(*Metrics).GetStats(...)
+	/Users/dpm/Downloads/Projects/dpm/otp-service/internal/metrics/metrics.go:78
+otp-service/internal/admin.(*DashboardManager).getStats(0x12a05f200?)
+	/Users/dpm/Downloads/Projects/dpm/otp-service/internal/admin/dashboard.go:253 +0x3c
+otp-service/internal/admin.(*DashboardManager).startPeriodicUpdates(0x140004150e0)
+	/Users/dpm/Downloads/Projects/dpm/otp-service/internal/admin/dashboard.go:439 +0x8c
+created by otp-service/internal/admin.NewDashboardManager in goroutine 1
+	/Users/dpm/Downloads/Projects/dpm/otp-service/internal/admin/dashboard.go:137 +0x1e8
+exit status 2

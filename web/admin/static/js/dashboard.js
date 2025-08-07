@@ -14,15 +14,71 @@ class AdminDashboard {
     }
 
     init() {
-        this.loadSettings();
-        this.initializeWebSocket();
-        this.initializeCharts();
-        this.bindEvents();
-        this.startPeriodicUpdates();
+        this.checkAuthentication().then(() => {
+            this.loadSettings();
+            this.initializeWebSocket();
+            this.initializeCharts();
+            this.bindEvents();
+            this.startPeriodicUpdates();
+            
+            // Initialize UI
+            this.updateConnectionStatus(false);
+            this.loadInitialData();
+        }).catch(() => {
+            // Authentication failed, redirect to login
+            window.location.href = '/admin/login';
+        });
+    }
+    
+    // Check if user is authenticated
+    async checkAuthentication() {
+        const token = localStorage.getItem('admin_token');
+        if (!token) {
+            throw new Error('No token found');
+        }
         
-        // Initialize UI
-        this.updateConnectionStatus(false);
-        this.loadInitialData();
+        try {
+            const response = await fetch('/admin/auth/verify', {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json',
+                },
+            });
+            
+            if (!response.ok) {
+                localStorage.removeItem('admin_token');
+                throw new Error('Token validation failed');
+            }
+            
+            // Add token to all subsequent requests
+            this.setupAuthHeaders();
+            
+        } catch (error) {
+            localStorage.removeItem('admin_token');
+            throw error;
+        }
+    }
+    
+    // Setup default authorization headers
+    setupAuthHeaders() {
+        const token = localStorage.getItem('admin_token');
+        if (token) {
+            // Store original fetch
+            const originalFetch = window.fetch;
+            
+            // Override fetch to include auth header
+            window.fetch = function(url, options = {}) {
+                if (url.startsWith('/admin/api/')) {
+                    options.headers = {
+                        ...options.headers,
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    };
+                }
+                return originalFetch(url, options);
+            };
+        }
     }
 
     // WebSocket Connection
@@ -52,6 +108,14 @@ class AdminDashboard {
 
             this.socket.on('activity_update', (activity) => {
                 this.addActivityItem(activity);
+                this.showNotification('New Activity', activity.message);
+            });
+            
+            // Handle authentication errors
+            this.socket.on('auth_error', () => {
+                console.error('WebSocket authentication failed');
+                localStorage.removeItem('admin_token');
+                window.location.href = '/admin/login';
             });
 
             this.socket.on('health_update', (health) => {

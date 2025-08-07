@@ -139,7 +139,31 @@ func NewDashboardManager(metricsService *metrics.Metrics, logger *logrus.Logger)
 	return dm
 }
 
-// SetupRoutes configures the admin dashboard routes
+// ServeDashboardHTML serves the dashboard HTML page (no auth required)
+func (dm *DashboardManager) ServeDashboardHTML(c *gin.Context) {
+	c.File("./web/admin/dashboard.html")
+}
+
+// SetupProtectedRoutes configures the protected admin API routes
+func (dm *DashboardManager) SetupProtectedRoutes(router *gin.RouterGroup) {
+	// Serve static files (no auth required)
+	router.Static("/static", "./web/admin/static")
+	
+	// Protected API endpoints
+	api := router.Group("/api")
+	{
+		api.GET("/dashboard-data", dm.getDashboardData)
+		api.GET("/stats", dm.getStatistics)
+		api.GET("/health", dm.getSystemHealth)
+		api.GET("/activities", dm.getActivities)
+		api.GET("/chart-data", dm.getChartData)
+	}
+	
+	// WebSocket endpoint (protected)
+	router.GET("/ws", dm.handleWebSocket)
+}
+
+// SetupRoutes configures the admin dashboard routes (legacy method)
 func (dm *DashboardManager) SetupRoutes(router *gin.RouterGroup) {
 	// Serve static files
 	router.Static("/static", "./web/admin/static")
@@ -161,7 +185,7 @@ func (dm *DashboardManager) SetupRoutes(router *gin.RouterGroup) {
 	router.GET("/ws", dm.handleWebSocket)
 }
 
-// serveDashboard serves the main dashboard HTML page
+// serveDashboard serves the main dashboard HTML page (legacy)
 func (dm *DashboardManager) serveDashboard(c *gin.Context) {
 	c.File("./web/admin/dashboard.html")
 }
@@ -226,6 +250,22 @@ func (dm *DashboardManager) handleWebSocket(c *gin.Context) {
 
 // getStats generates current statistics
 func (dm *DashboardManager) getStats() *Statistics {
+	// Handle case where metrics service is not available
+	if dm.metricsService == nil {
+		return &Statistics{
+			ActiveOTPs:      0,
+			SuccessRate:     0,
+			AvgResponseTime: 0,
+			RateLimited:     0,
+			Trends: map[string]TrendData{
+				"activeOtps":    {Value: "+0%", Direction: "neutral"},
+				"successRate":   {Value: "+0%", Direction: "neutral"},
+				"responseTime":  {Value: "0ms", Direction: "neutral"},
+				"rateLimited":   {Value: "+0", Direction: "neutral"},
+			},
+		}
+	}
+	
 	stats := dm.metricsService.GetStats()
 	
 	// Calculate success rate
