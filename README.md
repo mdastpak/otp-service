@@ -347,6 +347,168 @@ The OTP service has undergone significant architectural improvements to enhance 
 
 These improvements make the OTP service more robust, performant, and ready for production workloads at scale.
 
+## Admin Dashboard
+
+The OTP service now includes a comprehensive **graphical admin dashboard** with real-time analytics and monitoring capabilities.
+
+### 🎯 **Key Features**
+
+#### **Real-time Statistics**
+- **Active OTPs**: Live count of currently valid OTPs
+- **Success Rate**: Real-time success/failure percentage
+- **Response Time**: P95 latency monitoring  
+- **Rate Limited**: Current rate limiting statistics
+
+#### **📊 Interactive Charts**
+- **Operations Timeline**: Real-time OTP generation and verification trends
+- **Success vs Failure Rate**: Visual breakdown of operation outcomes
+- **Performance Metrics**: Response time and throughput analytics
+
+#### **🔄 Live Activity Feed**
+- Real-time stream of OTP operations
+- Filterable by success, failure, and rate-limited events
+- Detailed event information with timestamps
+
+#### **🏥 System Health Monitoring**
+- **API Service**: Health status and uptime
+- **Redis Cluster**: Connection status and performance
+- **Memory Usage**: Real-time memory consumption
+- **CPU Usage**: System resource monitoring
+
+### 🚀 **Access & Authentication**
+
+#### **Dashboard URL**
+```
+http://localhost:8080/admin/
+```
+
+#### **Authentication Options**
+- **JWT Authentication**: Secure token-based access (default)
+- **Basic Authentication**: Simple username/password
+- **IP Whitelisting**: Restrict access by IP address
+- **Rate Limiting**: Built-in protection against abuse
+
+#### **Default Credentials** (Change in Production!)
+```
+Username: admin
+Password: admin123
+```
+
+### ⚙️ **Configuration**
+
+Configure the admin dashboard in `config.yaml`:
+
+```yaml
+admin:
+  enabled: true                    # Enable/disable dashboard
+  jwt_secret: "your-secret-key"    # JWT signing secret
+  allowed_ips: ["127.0.0.1"]      # IP whitelist
+  basic_auth: false                # Use JWT (true for basic auth)
+  require_auth: true               # Enable authentication
+```
+
+#### **Docker Environment Variables**
+
+For Docker deployments, use environment variables to override config:
+
+```bash
+# Admin configuration
+ADMIN_ENABLED=true
+ADMIN_JWT_SECRET=your-jwt-secret
+ADMIN_ALLOWED_IPS=127.0.0.1,::1,172.20.0.1  # Comma-separated IPs
+ADMIN_BASIC_AUTH=false
+ADMIN_REQUIRE_AUTH=false  # Set to false for development/test mode
+
+# Server configuration
+SERVER_MODE=test  # Enables test mode bypass for development
+```
+
+**Docker Compose Note**: When using Docker Compose, the client IP appears as the Docker network gateway (e.g., `172.20.0.1`). The service automatically includes common Docker network IPs in the whitelist when running in test mode.
+
+### 🔧 **Technical Features**
+
+#### **WebSocket Integration**
+- Real-time data streaming to dashboard
+- Automatic reconnection handling
+- Live updates without page refresh
+
+#### **Responsive Design**
+- Mobile-friendly interface
+- Dark mode support
+- Customizable refresh intervals
+
+#### **Performance Optimized**
+- Efficient data aggregation
+- Minimal resource overhead
+- Caching for frequently accessed data
+
+#### **Enhanced Startup Logging**
+The service now provides comprehensive startup information displayed when launching:
+- **Admin dashboard URLs**: Exact paths to dashboard and login pages
+- **Available features**: Real-time analytics, charts, activity feed, health monitoring
+- **Security configuration**: Authentication method, IP whitelist, rate limiting status
+- **Server configuration**: Mode, Redis connection, TLS status, security headers
+- **Default credentials**: Displayed with security warnings for production use
+
+Example startup output:
+```
+🎛️  Admin Dashboard:
+   ├─ Dashboard: http://localhost:8080/admin/
+   ├─ Login:     http://localhost:8080/admin/login
+   ├─ Features:
+   │  ├─ 📊 Real-time Analytics
+   │  ├─ 📈 Interactive Charts
+   │  ├─ 📋 Live Activity Feed
+   │  └─ 🔍 System Health Monitoring
+   └─ Security:
+      ├─ 🔐 JWT Authentication Enabled
+      ├─ 🛡️  IP Whitelist: [127.0.0.1 ::1]
+      └─ 🚦 Rate Limiting Enabled
+```
+
+### 📋 **API Endpoints**
+
+The dashboard provides RESTful APIs for programmatic access:
+
+- `GET /admin/api/dashboard-data` - Complete dashboard data
+- `GET /admin/api/stats` - Current statistics
+- `GET /admin/api/health` - System health status
+- `GET /admin/api/activities` - Recent activities
+- `GET /admin/api/chart-data` - Chart data for visualization
+- `WebSocket /admin/ws` - Real-time data stream
+
+### 🔒 **Security Features**
+
+- **JWT-based authentication** with configurable expiry
+- **IP address whitelisting** for network-level security
+- **Rate limiting** to prevent abuse
+- **Secure WebSocket connections** with authentication
+- **CSRF protection** for all API endpoints
+- **Input validation** and sanitization
+- **Enhanced access logging** with detailed request information
+- **Test mode bypass** for development and testing
+
+#### **Enhanced Security Logging**
+The admin panel now provides comprehensive access logging with detailed information:
+- **IP address tracking**: Client IP with User-Agent details
+- **Request metadata**: URI, method, and timestamp
+- **Authorization status**: Success/failure with detailed context
+- **Rate limiting events**: Comprehensive rate limit monitoring
+
+#### **Test Mode Features**
+When `server.mode = "test"` in configuration:
+- **IP validation bypass**: Allows access from any IP address
+- **Authentication bypass**: Skips JWT validation with test admin context
+- **Enhanced logging**: Shows bypass events with full request details
+- **Development convenience**: Simplifies testing and development workflows
+
+**⚠️ Production Security Notes:**
+- Change default credentials immediately
+- Use strong JWT secrets (32+ characters)
+- Configure IP whitelisting appropriately
+- Enable HTTPS in production
+- Consider placing behind a reverse proxy
+- **Never use test mode in production environments**
 
 ## Development Roadmap
 
@@ -384,6 +546,7 @@ The OTP service follows a strategic 5-phase development roadmap designed to evol
 - **[ROADMAP.md](ROADMAP.md)** - Complete development roadmap, feature planning, and project vision
 - **[TESTING.md](TESTING.md)** - Comprehensive testing documentation, test suite overview, and quality assessment
 - **[SECURITY.md](SECURITY.md)** - Security policy, vulnerability reporting, and security best practices
+- **[WORKFLOW.md](WORKFLOW.md)** - Git workflow, branching strategy, and development process guidelines
 
 ---
 

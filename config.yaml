@@ -1,6 +1,6 @@
 redis:
   host: "localhost"
-  port: "6379"
+  port: "6380"
   password: ""
   indices: "0-5"
   key_prefix: "" #can be empty
@@ -25,4 +25,10 @@ server:
 config:
   hash_keys: true
 
+admin:
+  enabled: true
+  jwt_secret: "your-super-secret-jwt-key-change-in-production"
+  allowed_ips: ["127.0.0.1", "::1", "172.20.0.1"]  # Include Docker network gateway IP
+  basic_auth: false    # Use JWT auth instead of basic auth
+  require_auth: true   # Set to false for development (NOT recommended for production)
 
