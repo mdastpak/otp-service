@@ -25,10 +25,4 @@ server:
 config:
   hash_keys: true
 
-admin:
-  enabled: true
-  jwt_secret: "your-super-secret-jwt-key-change-in-production"
-  allowed_ips: ["127.0.0.1", "::1"]  # Add your allowed IPs here
-  basic_auth: false    # Use JWT auth instead of basic auth
-  require_auth: true   # Set to false for development (NOT recommended for production)
 
