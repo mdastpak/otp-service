@@ -16,7 +16,6 @@ This README provides details on the API endpoints, input parameters, expected re
 - [Additional Notes](#additional-notes)
 - [Redis Configuration](#redis-configuration)
 - [Technical Architecture](#technical-architecture)
-- [Admin Dashboard](#admin-dashboard)
 - [Development Roadmap](#development-roadmap)
 - [Related Documentation](#related-documentation)
 
@@ -348,109 +347,6 @@ The OTP service has undergone significant architectural improvements to enhance 
 
 These improvements make the OTP service more robust, performant, and ready for production workloads at scale.
 
-## Admin Dashboard
-
-The OTP service now includes a comprehensive **graphical admin dashboard** with real-time analytics and monitoring capabilities.
-
-### 🎯 **Key Features**
-
-#### **Real-time Statistics**
-- **Active OTPs**: Live count of currently valid OTPs
-- **Success Rate**: Real-time success/failure percentage
-- **Response Time**: P95 latency monitoring  
-- **Rate Limited**: Current rate limiting statistics
-
-#### **📊 Interactive Charts**
-- **Operations Timeline**: Real-time OTP generation and verification trends
-- **Success vs Failure Rate**: Visual breakdown of operation outcomes
-- **Performance Metrics**: Response time and throughput analytics
-
-#### **🔄 Live Activity Feed**
-- Real-time stream of OTP operations
-- Filterable by success, failure, and rate-limited events
-- Detailed event information with timestamps
-
-#### **🏥 System Health Monitoring**
-- **API Service**: Health status and uptime
-- **Redis Cluster**: Connection status and performance
-- **Memory Usage**: Real-time memory consumption
-- **CPU Usage**: System resource monitoring
-
-### 🚀 **Access & Authentication**
-
-#### **Dashboard URL**
-```
-http://localhost:8080/admin/
-```
-
-#### **Authentication Options**
-- **JWT Authentication**: Secure token-based access (default)
-- **Basic Authentication**: Simple username/password
-- **IP Whitelisting**: Restrict access by IP address
-- **Rate Limiting**: Built-in protection against abuse
-
-#### **Default Credentials** (Change in Production!)
-```
-Username: admin
-Password: admin123
-```
-
-### ⚙️ **Configuration**
-
-Configure the admin dashboard in `config.yaml`:
-
-```yaml
-admin:
-  enabled: true                    # Enable/disable dashboard
-  jwt_secret: "your-secret-key"    # JWT signing secret
-  allowed_ips: ["127.0.0.1"]      # IP whitelist
-  basic_auth: false                # Use JWT (true for basic auth)
-  require_auth: true               # Enable authentication
-```
-
-### 🔧 **Technical Features**
-
-#### **WebSocket Integration**
-- Real-time data streaming to dashboard
-- Automatic reconnection handling
-- Live updates without page refresh
-
-#### **Responsive Design**
-- Mobile-friendly interface
-- Dark mode support
-- Customizable refresh intervals
-
-#### **Performance Optimized**
-- Efficient data aggregation
-- Minimal resource overhead
-- Caching for frequently accessed data
-
-### 📋 **API Endpoints**
-
-The dashboard provides RESTful APIs for programmatic access:
-
-- `GET /admin/api/dashboard-data` - Complete dashboard data
-- `GET /admin/api/stats` - Current statistics
-- `GET /admin/api/health` - System health status
-- `GET /admin/api/activities` - Recent activities
-- `GET /admin/api/chart-data` - Chart data for visualization
-- `WebSocket /admin/ws` - Real-time data stream
-
-### 🔒 **Security Features**
-
-- **JWT-based authentication** with configurable expiry
-- **IP address whitelisting** for network-level security
-- **Rate limiting** to prevent abuse
-- **Secure WebSocket connections** with authentication
-- **CSRF protection** for all API endpoints
-- **Input validation** and sanitization
-
-**⚠️ Production Security Notes:**
-- Change default credentials immediately
-- Use strong JWT secrets (32+ characters)
-- Configure IP whitelisting appropriately
-- Enable HTTPS in production
-- Consider placing behind a reverse proxy
 
 ## Development Roadmap
 
@@ -474,7 +370,7 @@ The OTP service follows a strategic 5-phase development roadmap designed to evol
 ### **Phase 4: Enterprise Features** 🚀 **FUTURE**
 - Multi-tenant architecture and compliance
 - Advanced API capabilities (GraphQL, gRPC)
-- Admin dashboard and white-label solutions
+- White-label solutions and enterprise integrations
 
 ### **Phase 5: AI/ML Integration** 🤖 **VISIONARY**
 - Intelligent fraud detection and optimization
