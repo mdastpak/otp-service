@@ -25,6 +25,15 @@ type Config struct {
 
 // NewAdminIntegration creates a new admin integration instance
 func NewAdminIntegration(metricsService *metrics.Metrics, logger *logrus.Logger, config Config) *AdminIntegration {
+	return newAdminIntegration(metricsService, logger, config, "")
+}
+
+// NewAdminIntegrationWithMode creates a new admin integration instance with server mode
+func NewAdminIntegrationWithMode(metricsService *metrics.Metrics, logger *logrus.Logger, config Config, serverMode string) *AdminIntegration {
+	return newAdminIntegration(metricsService, logger, config, serverMode)
+}
+
+func newAdminIntegration(metricsService *metrics.Metrics, logger *logrus.Logger, config Config, serverMode string) *AdminIntegration {
 	// Use default JWT secret if not provided
 	jwtSecret := config.JWTSecret
 	if jwtSecret == "" {
@@ -33,7 +42,12 @@ func NewAdminIntegration(metricsService *metrics.Metrics, logger *logrus.Logger,
 	}
 
 	dashboardManager := NewDashboardManager(metricsService, logger)
-	authManager := NewAuthManager(jwtSecret, logger)
+	var authManager *AuthManager
+	if serverMode != "" {
+		authManager = NewAuthManagerWithMode(jwtSecret, logger, serverMode)
+	} else {
+		authManager = NewAuthManager(jwtSecret, logger)
+	}
 
 	return &AdminIntegration{
 		dashboardManager: dashboardManager,
@@ -51,45 +65,68 @@ func (ai *AdminIntegration) SetupAdminRoutes(router *gin.Engine, config Config) 
 
 	ai.logger.Info("Setting up admin dashboard routes")
 
-	// Create admin group
-	adminGroup := router.Group("/admin")
+	// Main /admin route with access control
+	router.GET("/admin", ai.authManager.AdminAccessMiddleware(config.AllowedIPs, config.ServerMode))
+	router.GET("/admin/", ai.authManager.AdminAccessMiddleware(config.AllowedIPs, config.ServerMode))
 
-	// Apply security middlewares
-	if len(config.AllowedIPs) > 0 {
-		adminGroup.Use(ai.authManager.IPWhitelistMiddleware(config.AllowedIPs, config.ServerMode))
-	}
+	// Create admin group for other routes
+	adminGroup := router.Group("/admin")
 
 	// Apply rate limiting
 	adminGroup.Use(ai.authManager.RateLimitMiddleware())
 
-	// Authentication routes (no auth required)
+	// Authentication routes (no additional auth required)
 	authGroup := adminGroup.Group("/auth")
+	// Apply IP whitelist to auth routes
+	if len(config.AllowedIPs) > 0 {
+		authGroup.Use(ai.authManager.IPWhitelistMiddleware(config.AllowedIPs, config.ServerMode))
+	}
 	ai.authManager.SetupAuthRoutes(authGroup)
 
-	// Login page route (no auth required)
-	adminGroup.GET("/login", ai.authManager.ServeLoginPage)
+	// Login page route (with IP whitelist only)
+	loginGroup := adminGroup.Group("/login")
+	if len(config.AllowedIPs) > 0 {
+		loginGroup.Use(ai.authManager.IPWhitelistMiddleware(config.AllowedIPs, config.ServerMode))
+	}
+	loginGroup.GET("", ai.authManager.ServeLoginPage)
+	loginGroup.GET("/", ai.authManager.ServeLoginPage)
 
-	// Protected routes
-	var protectedGroup *gin.RouterGroup
-
+	// Dashboard HTML page (IP whitelist only - auth checked client-side)
+	dashboardHTMLGroup := adminGroup.Group("/dashboard")
+	if len(config.AllowedIPs) > 0 {
+		dashboardHTMLGroup.Use(ai.authManager.IPWhitelistMiddleware(config.AllowedIPs, config.ServerMode))
+	}
+	// Serve static files for dashboard (no auth required)
+	dashboardHTMLGroup.Static("/static", "./web/admin/static")
+	// Serve dashboard HTML without JWT requirement
+	dashboardHTMLGroup.GET("", ai.dashboardManager.ServeDashboardHTML)
+	dashboardHTMLGroup.GET("/", ai.dashboardManager.ServeDashboardHTML)
+	
+	// Protected API routes (require JWT)
+	protectedGroup := adminGroup.Group("/")
+	// Apply IP whitelist first
+	if len(config.AllowedIPs) > 0 {
+		protectedGroup.Use(ai.authManager.IPWhitelistMiddleware(config.AllowedIPs, config.ServerMode))
+	}
+	
 	if config.RequireAuth {
 		if config.BasicAuth {
 			// Use basic authentication
-			protectedGroup = adminGroup.Group("/", ai.authManager.BasicAuthMiddleware())
+			protectedGroup.Use(ai.authManager.BasicAuthMiddleware())
 		} else {
 			// Use JWT authentication
-			protectedGroup = adminGroup.Group("/", ai.authManager.JWTAuthMiddleware(config.ServerMode))
+			protectedGroup.Use(ai.authManager.JWTAuthMiddleware(config.ServerMode))
 		}
 	} else {
 		// No authentication required (development only)
 		ai.logger.Warn("Admin dashboard running without authentication - NOT recommended for production!")
-		protectedGroup = adminGroup.Group("/")
 	}
 
-	// Setup dashboard routes
-	ai.dashboardManager.SetupRoutes(protectedGroup)
+	// Setup protected API routes
+	ai.dashboardManager.SetupProtectedRoutes(protectedGroup)
 
-	ai.logger.Info("Admin dashboard available at /admin/")
+	ai.logger.Info("Admin dashboard available at /admin/ (redirects to /admin/dashboard)")
+	ai.logger.Info("Admin login available at /admin/login")
 }
 
 // GetDashboardManager returns the dashboard manager for external access

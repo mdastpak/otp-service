@@ -1,7 +1,9 @@
 package admin
 
 import (
+	"crypto/rand"
 	"crypto/subtle"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -24,6 +26,13 @@ type AuthManager struct {
 	jwtSecret   []byte
 	adminUsers  map[string]string // username -> password hash
 	logger      *logrus.Logger
+	testModeCredentials *TestCredentials // For test mode
+}
+
+// TestCredentials holds the randomly generated test mode credentials
+type TestCredentials struct {
+	Username string
+	Password string
 }
 
 // LoginRequest represents a login request
@@ -47,16 +56,38 @@ type User struct {
 
 // NewAuthManager creates a new authentication manager
 func NewAuthManager(jwtSecret string, logger *logrus.Logger) *AuthManager {
+	return newAuthManager(jwtSecret, logger, "")
+}
+
+// NewAuthManagerWithMode creates a new authentication manager with server mode
+func NewAuthManagerWithMode(jwtSecret string, logger *logrus.Logger, serverMode string) *AuthManager {
+	return newAuthManager(jwtSecret, logger, serverMode)
+}
+
+func newAuthManager(jwtSecret string, logger *logrus.Logger, serverMode string) *AuthManager {
 	// In production, load admin users from secure configuration
 	adminUsers := map[string]string{
-		"admin": "$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi", // password: "admin123"
+		"admin": "$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi", // bcrypt hash of default password
 	}
 	
-	return &AuthManager{
+	am := &AuthManager{
 		jwtSecret:  []byte(jwtSecret),
 		adminUsers: adminUsers,
 		logger:     logger,
 	}
+	
+	// Generate random credentials for test mode
+	if serverMode == "test" {
+		creds := generateTestCredentials()
+		am.testModeCredentials = creds
+		logger.WithFields(logrus.Fields{
+			"username": creds.Username,
+			"password": creds.Password,
+			"mode":     "test",
+		}).Info("🔧 Test mode admin credentials generated")
+	}
+	
+	return am
 }
 
 // SetupAuthRoutes configures authentication routes
@@ -69,7 +100,7 @@ func (am *AuthManager) SetupAuthRoutes(router *gin.RouterGroup) {
 // BasicAuthMiddleware provides basic HTTP authentication for admin access
 func (am *AuthManager) BasicAuthMiddleware() gin.HandlerFunc {
 	return gin.BasicAuth(gin.Accounts{
-		"admin": "admin123", // In production, use secure passwords
+		"admin": "admin123", // TODO: Load from secure configuration in production
 	})
 }
 
@@ -446,8 +477,14 @@ func (am *AuthManager) validateToken(tokenString string) (*AdminClaims, error) {
 }
 
 func (am *AuthManager) verifyCredentials(username, password string) bool {
-	// In production, use proper password hashing (bcrypt)
-	// For demo purposes, using simple comparison
+	// Check test mode credentials first
+	if am.testModeCredentials != nil {
+		if username == am.testModeCredentials.Username {
+			return subtle.ConstantTimeCompare([]byte(password), []byte(am.testModeCredentials.Password)) == 1
+		}
+	}
+	
+	// Check regular admin users
 	_, exists := am.adminUsers[username]
 	if !exists {
 		return false
@@ -562,6 +599,31 @@ func (am *AuthManager) CreateAdminLoginPage() string {
     </div>
 
     <script>
+        // Check if user is already logged in
+        window.addEventListener('load', async () => {
+            const token = localStorage.getItem('admin_token');
+            if (token) {
+                try {
+                    const response = await fetch('/admin/auth/verify', {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': 'Bearer ' + token,
+                            'Content-Type': 'application/json',
+                        },
+                    });
+                    
+                    if (response.ok) {
+                        // Token is valid, redirect to dashboard
+                        window.location.href = '/admin/dashboard';
+                        return;
+                    }
+                } catch (error) {
+                    // Token verification failed, remove invalid token
+                    localStorage.removeItem('admin_token');
+                }
+            }
+        });
+        
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -581,9 +643,9 @@ func (am *AuthManager) CreateAdminLoginPage() string {
                 const data = await response.json();
                 
                 if (response.ok) {
-                    // Store token and redirect
+                    // Store token and redirect to dashboard
                     localStorage.setItem('admin_token', data.token);
-                    window.location.href = '/admin/';
+                    window.location.href = '/admin/dashboard';
                 } else {
                     errorDiv.textContent = data.error || 'Login failed';
                     errorDiv.style.display = 'block';
@@ -597,6 +659,209 @@ func (am *AuthManager) CreateAdminLoginPage() string {
 </body>
 </html>
 `
+}
+
+// generateTestCredentials creates random username and password for test mode
+func generateTestCredentials() *TestCredentials {
+	// Generate random username
+	usernameSuffix := make([]byte, 4)
+	rand.Read(usernameSuffix)
+	username := fmt.Sprintf("admin_%x", usernameSuffix)
+	
+	// Generate random password
+	passwordBytes := make([]byte, 8)
+	rand.Read(passwordBytes)
+	password := fmt.Sprintf("%x", passwordBytes)
+	
+	return &TestCredentials{
+		Username: username,
+		Password: password,
+	}
+}
+
+// AdminAccessMiddleware handles /admin route access control
+func (am *AuthManager) AdminAccessMiddleware(allowedIPs []string, serverMode string) gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
+		clientIP := c.ClientIP()
+		userAgent := c.GetHeader("User-Agent")
+		requestURI := c.Request.RequestURI
+		method := c.Request.Method
+		
+		// Step 1: Check IP whitelist (bypass in test mode)
+		ipAllowed := serverMode == "test" || isIPAllowed(clientIP, allowedIPs)
+		
+		if !ipAllowed {
+			// Log unauthorized access attempt
+			am.logger.WithFields(logrus.Fields{
+				"ip":           clientIP,
+				"user_agent":   userAgent,
+				"request_uri":  requestURI,
+				"method":       method,
+				"allowed_ips":  allowedIPs,
+			}).Warn("Admin access denied: IP not whitelisted")
+			
+			// Show restriction message
+			c.Header("Content-Type", "text/html")
+			c.String(http.StatusForbidden, am.CreateRestrictionPage(clientIP))
+			c.Abort()
+			return
+		}
+		
+		// Step 2: Check JWT token
+		tokenString := am.extractToken(c)
+		if tokenString != "" {
+			claims, err := am.validateToken(tokenString)
+			if err == nil {
+				// Valid token - redirect to dashboard
+				am.logger.WithFields(logrus.Fields{
+					"ip":           clientIP,
+					"user_agent":   userAgent,
+					"admin_user":   claims.Username,
+				}).Info("Admin access: valid token, redirecting to dashboard")
+				
+				c.Redirect(http.StatusFound, "/admin/dashboard")
+				c.Abort()
+				return
+			}
+		}
+		
+		// Step 3: No valid token but IP is allowed - show login page
+		am.logger.WithFields(logrus.Fields{
+			"ip":           clientIP,
+			"user_agent":   userAgent,
+			"request_uri":  requestURI,
+			"method":       method,
+		}).Info("Admin access: IP authorized, showing login page")
+		
+		c.Header("Content-Type", "text/html")
+		c.String(http.StatusOK, am.CreateAdminLoginPage())
+		c.Abort()
+	})
+}
+
+// isIPAllowed checks if the client IP is in the allowed list or localhost
+func isIPAllowed(clientIP string, allowedIPs []string) bool {
+	// Always allow localhost
+	if clientIP == "127.0.0.1" || clientIP == "::1" {
+		return true
+	}
+	
+	// Check whitelist
+	for _, allowedIP := range allowedIPs {
+		if clientIP == allowedIP {
+			return true
+		}
+	}
+	
+	return false
+}
+
+// CreateRestrictionPage creates an HTML page for IP restriction
+func (am *AuthManager) CreateRestrictionPage(clientIP string) string {
+	return fmt.Sprintf(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Access Restricted - OTP Service</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #e74c3c 0%%, #c0392b 100%%);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+        }
+        .restriction-container {
+            background: white;
+            padding: 3rem;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            text-align: center;
+            max-width: 500px;
+            width: 90%%;
+        }
+        .restriction-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+        .restriction-title {
+            color: #e74c3c;
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+        .restriction-message {
+            color: #666;
+            font-size: 1.1rem;
+            line-height: 1.6;
+            margin-bottom: 2rem;
+        }
+        .client-info {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 8px;
+            border-left: 4px solid #e74c3c;
+            margin: 1.5rem 0;
+        }
+        .client-info h3 {
+            color: #333;
+            margin-top: 0;
+            font-size: 1.2rem;
+        }
+        .client-info p {
+            color: #666;
+            margin: 0.5rem 0;
+            font-family: 'Courier New', monospace;
+        }
+        .contact-info {
+            background: #e8f4fd;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-top: 2rem;
+        }
+        .contact-info h3 {
+            color: #2980b9;
+            margin-top: 0;
+        }
+        .footer {
+            margin-top: 2rem;
+            color: #999;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="restriction-container">
+        <div class="restriction-icon">🚫</div>
+        <h1 class="restriction-title">Access Restricted</h1>
+        <p class="restriction-message">
+            Your IP address is not authorized to access the OTP Service Administration Panel.
+            This security measure protects our system from unauthorized access.
+        </p>
+        
+        <div class="client-info">
+            <h3>🔍 Connection Information</h3>
+            <p><strong>Your IP Address:</strong> %s</p>
+            <p><strong>Access Attempt:</strong> %s</p>
+            <p><strong>Status:</strong> Blocked</p>
+        </div>
+        
+        <div class="contact-info">
+            <h3>📞 Need Access?</h3>
+            <p>If you believe you should have access to this system, please contact your system administrator to add your IP address to the whitelist.</p>
+        </div>
+        
+        <div class="footer">
+            <p>🔒 This access attempt has been logged for security purposes.</p>
+        </div>
+    </div>
+</body>
+</html>
+`, clientIP, time.Now().UTC().Format("2006-01-02 15:04:05 UTC"))
 }
 
 // ServeLoginPage serves the admin login page

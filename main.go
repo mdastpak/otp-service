@@ -223,7 +223,7 @@ func init() {
 		RequireAuth: cfg.Admin.RequireAuth,
 		ServerMode:  cfg.Server.Mode,
 	}
-	adminIntegration = admin.NewAdminIntegration(metricsService, logger, adminConfig)
+	adminIntegration = admin.NewAdminIntegrationWithMode(metricsService, logger, adminConfig, cfg.Server.Mode)
 
 	logger.SetLevel(logrus.InfoLevel)
 
@@ -860,11 +860,15 @@ func main() {
 		logger.Info("      └─ 🚦 Rate Limiting Enabled")
 		logger.Info("")
 		
-		// Admin credentials info
+		// Admin credentials warning
 		if cfg.Admin.RequireAuth {
-			logger.Info("🔑 Default Credentials (CHANGE IN PRODUCTION!):")
-			logger.Info("   ├─ Username: admin")
-			logger.Info("   └─ Password: admin123")
+			if cfg.Server.Mode == "test" || cfg.Server.Mode == "development" {
+				logger.Warn("🔑 Using Default Admin Credentials - CHANGE IN PRODUCTION!")
+				logger.Warn("   └─ Review admin configuration in production deployments")
+			} else {
+				logger.Info("🔑 Admin Authentication: ✅ Enabled")
+				logger.Info("   └─ Ensure strong credentials are configured")
+			}
 		}
 	} else {
 		logger.Warn("⚠️  Admin Dashboard DISABLED")
