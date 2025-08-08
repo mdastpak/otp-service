@@ -1,27 +1,30 @@
+# OTP Service Configuration
+# Default values - override with environment variables (.env file)
+# See .env for all available environment variables
+
 redis:
-  host: "localhost"
-  port: "6379"
-  password: ""
-  indices: "0-5"
-  key_prefix: "" #can be empty
-  timeout: 5
+  host: "localhost"                    # Override with REDIS_HOST
+  port: "6379"                        # Override with REDIS_PORT  
+  password: ""                        # Override with REDIS_PASSWORD
+  indices: "0-5"                      # Override with REDIS_INDICES
+  key_prefix: ""                      # Override with REDIS_KEY_PREFIX (can be empty)
+  timeout: 5                          # Override with REDIS_TIMEOUT
 
 server:
-  host: "localhost"
-  port: "8080"
-  mode: "test" # can be "release", "debug" or "test". default is "release"
+  host: "localhost"                   # Override with SERVER_HOST
+  port: "8080"                       # Override with SERVER_PORT
+  mode: "test"                       # Override with SERVER_MODE (release/test)
   timeout:
-    read: 5
-    write: 10
-    idle: 120
-    read_header: 2
+    read: 5                          # Override with SERVER_TIMEOUT_READ
+    write: 10                        # Override with SERVER_TIMEOUT_WRITE
+    idle: 120                        # Override with SERVER_TIMEOUT_IDLE
+    read_header: 2                   # Override with SERVER_TIMEOUT_READ_HEADER
   tls: 
-    enabled: false
-    cert_file: "cert.pem"
-    key_file: "key.pem"
-    client_certs: "client_certs.pem"
-
+    enabled: false                   # Override with TLS_ENABLED
+    cert_file: "cert.pem"           # Override with TLS_CERT_FILE
+    key_file: "key.pem"             # Override with TLS_KEY_FILE
+    client_certs: "client_certs.pem" # Override with TLS_CLIENT_CERTS
 
 config:
-  hash_keys: true
+  hash_keys: true                    # Override with HASH_KEYS
 
