@@ -35,14 +35,14 @@ type Client struct {
 // NewClient creates a new Redis client with connection pooling
 func NewClient(cfg *config.Config, logger *logrus.Logger) (*Client, error) {
 	client := redis.NewClient(&redis.Options{
-		Addr:         fmt.Sprintf("%s:%s", cfg.Redis.Host, cfg.Redis.Port),
-		Password:     cfg.Redis.Password,
-		ReadTimeout:  time.Duration(cfg.Redis.Timeout) * time.Second,
-		WriteTimeout: time.Duration(cfg.Redis.Timeout) * time.Second,
-		PoolSize:     20,
-		MinIdleConns: 5,
-		MaxRetries:   3,
-		DialTimeout:  time.Duration(cfg.Redis.Timeout) * time.Second,
+		Addr:            fmt.Sprintf("%s:%s", cfg.Redis.Host, cfg.Redis.Port),
+		Password:        cfg.Redis.Password,
+		ReadTimeout:     time.Duration(cfg.Redis.Timeout) * time.Second,
+		WriteTimeout:    time.Duration(cfg.Redis.Timeout) * time.Second,
+		PoolSize:        20,
+		MinIdleConns:    5,
+		MaxRetries:      3,
+		DialTimeout:     time.Duration(cfg.Redis.Timeout) * time.Second,
 		ConnMaxIdleTime: 5 * time.Minute,
 	})
 
@@ -85,7 +85,7 @@ func (c *Client) Ping() error {
 // initShardConfig parses and caches shard configuration for performance
 func initShardConfig(cfg *config.Config) *ShardConfig {
 	rangeParts := strings.Split(cfg.Redis.Indices, "-")
-	
+
 	if cfg.Redis.Indices == "0" {
 		return &ShardConfig{shardCount: 1, startIndex: 0, isRange: false}
 	}
@@ -147,16 +147,16 @@ func (c *Client) getShardIndex(uuid string) int {
 		// Fallback for malformed UUIDs
 		return c.shardConfig.startIndex
 	}
-	
+
 	lastBytes := cleaned[len(cleaned)-8:] // Last 4 bytes as hex string
-	
+
 	// Convert hex to uint32 for modulo operation
 	hash, err := strconv.ParseUint(lastBytes, 16, 32)
 	if err != nil {
 		// Fallback for parse errors
 		return c.shardConfig.startIndex
 	}
-	
+
 	// Safe conversion: hash is guaranteed to fit in uint32, then convert to int
 	shardOffset := int(uint32(hash)) % c.shardConfig.shardCount
 	return c.shardConfig.startIndex + shardOffset

@@ -19,8 +19,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/redis/go-redis/v9"
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -130,7 +130,7 @@ func loadConfig() {
 // initShardConfig parses and caches shard configuration for performance
 func initShardConfig() {
 	rangeParts := strings.Split(cfg.Redis.Indices, "-")
-	
+
 	if cfg.Redis.Indices == "0" {
 		shardConfig = &ShardConfig{shardCount: 1, startIndex: 0, isRange: false}
 		return
@@ -338,16 +338,16 @@ func getShardIndex(uuid string) int {
 		// Fallback for malformed UUIDs
 		return shardConfig.startIndex
 	}
-	
+
 	lastBytes := cleaned[len(cleaned)-8:] // Last 4 bytes as hex string
-	
+
 	// Convert hex to uint32 for modulo operation
 	hash, err := strconv.ParseUint(lastBytes, 16, 32)
 	if err != nil {
 		// Fallback for parse errors
 		return shardConfig.startIndex
 	}
-	
+
 	// Safe conversion: hash is guaranteed to fit in uint32, then convert to int
 	shardOffset := int(uint32(hash)) % shardConfig.shardCount
 	return shardConfig.startIndex + shardOffset
@@ -427,7 +427,6 @@ func delOTPFromRedis(uuid string) error {
 	}
 	return nil
 }
-
 
 // generateOTPHandler handles the POST request to generate an OTP
 func generateOTPHandler(c *gin.Context) {
@@ -622,11 +621,11 @@ func verifyOTPHandler(c *gin.Context) {
 		responseData = map[string]interface{}{
 			"test_mode": true,
 			"debug_info": map[string]interface{}{
-				"verified_otp":    userInputOTP,
-				"original_ttl":    otpData.TTL,
-				"retry_limit":     otpData.RetryLimit,
-				"client_ip":       c.ClientIP(),
-				"user_agent":      c.Request.UserAgent(),
+				"verified_otp":      userInputOTP,
+				"original_ttl":      otpData.TTL,
+				"retry_limit":       otpData.RetryLimit,
+				"client_ip":         c.ClientIP(),
+				"user_agent":        c.Request.UserAgent(),
 				"verification_time": time.Now().Format(time.RFC3339),
 			},
 		}
@@ -727,11 +726,11 @@ func main() {
 			}
 			// Show some config details but not sensitive ones
 			responseData["config_summary"] = map[string]interface{}{
-				"redis_host":   cfg.Redis.Host,
-				"redis_port":   cfg.Redis.Port,
-				"server_host":  cfg.Server.Host,
-				"server_port":  cfg.Server.Port,
-				"hash_keys":    cfg.Config.HashKeys,
+				"redis_host":  cfg.Redis.Host,
+				"redis_port":  cfg.Redis.Port,
+				"server_host": cfg.Server.Host,
+				"server_port": cfg.Server.Port,
+				"hash_keys":   cfg.Config.HashKeys,
 			}
 		}
 

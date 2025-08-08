@@ -294,12 +294,12 @@ func (h *OTPHandler) VerifyOTP(c *gin.Context) {
 		responseData = map[string]interface{}{
 			"test_mode": true,
 			"debug_info": map[string]interface{}{
-				"verified_otp":       userInputOTP,
-				"original_ttl":       otpData.TTL,
-				"retry_limit":        otpData.RetryLimit,
-				"client_ip":          c.ClientIP(),
-				"user_agent":         c.Request.UserAgent(),
-				"verification_time":  time.Now().Format(time.RFC3339),
+				"verified_otp":      userInputOTP,
+				"original_ttl":      otpData.TTL,
+				"retry_limit":       otpData.RetryLimit,
+				"client_ip":         c.ClientIP(),
+				"user_agent":        c.Request.UserAgent(),
+				"verification_time": time.Now().Format(time.RFC3339),
 			},
 		}
 	}
@@ -326,11 +326,11 @@ func (h *OTPHandler) Health(c *gin.Context) {
 		}
 		// Show some config details but not sensitive ones
 		responseData["config_summary"] = map[string]interface{}{
-			"redis_host":   h.config.Redis.Host,
-			"redis_port":   h.config.Redis.Port,
-			"server_host":  h.config.Server.Host,
-			"server_port":  h.config.Server.Port,
-			"hash_keys":    h.config.Config.HashKeys,
+			"redis_host":  h.config.Redis.Host,
+			"redis_port":  h.config.Redis.Port,
+			"server_host": h.config.Server.Host,
+			"server_port": h.config.Server.Port,
+			"hash_keys":   h.config.Config.HashKeys,
 		}
 	}
 
