@@ -26,6 +26,7 @@ docker-compose.yaml
 .idea
 *.swp
 *.swo
+*.claude
 
 # OS
 .DS_Store

@@ -38,12 +38,9 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: otp-redis
     ports:
       - "6380:6379"
     command: redis-server --save 20 1 --loglevel warning
-    volumes:
-      - redis_data:/data
     restart: unless-stopped
     networks:
       - otp-network
@@ -63,28 +60,6 @@ services:
         reservations:
           cpus: '0.1'
           memory: 32M
-
-  # Optional: Redis monitoring
-  redis-exporter:
-    image: oliver006/redis_exporter:latest
-    container_name: redis-exporter
-    environment:
-      - REDIS_ADDR=redis:6379
-      - REDIS_PASSWORD=
-    ports:
-      - "9121:9121"
-    depends_on:
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - otp-network
-    profiles:
-      - monitoring
-
-volumes:
-  redis_data:
-    driver: local
 
 networks:
   otp-network:
