@@ -29,3 +29,7 @@ config_test.yaml
 
 # Go workspace file
 go.work
+
+# NPM files
+package*.json
+node_modules/

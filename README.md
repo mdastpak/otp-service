@@ -1,6 +1,7 @@
 # OTP Service API Documentation
 
-This README provides details on the API endpoints, input parameters, expected request/response bodies, and status codes for the OTP (One-Time Password) service.
+This README provides details on the API endpoints, input parameters, expected
+request/response bodies, and status codes for the OTP (One-Time Password) service.
 
 ## Table of Contents
 
@@ -26,17 +27,20 @@ This README provides details on the API endpoints, input parameters, expected re
 The OTP service has undergone significant performance improvements:
 
 #### 🚀 **Redis Sharding Performance (~10x faster)**
+
 - **UUID-based sharding**: Replaced SHA-256 hashing with direct UUID parsing
 - **Better distribution**: Uses 4 bytes (32-bit) instead of 1 byte (8-bit) entropy
 - **Configuration caching**: Parses Redis indices once at startup, eliminating repeated parsing
 - **Consistent results**: Same UUID always maps to the same shard
 
 #### 🔧 **Technical Details**
+
 - **Algorithm**: Uses last 4 bytes of UUID for excellent random distribution
 - **Fallback handling**: Graceful error handling for malformed UUIDs
 - **Range support**: Properly handles Redis index ranges like "2-5" with start+offset calculation
 
 #### 📊 **Redis Client Upgrade**
+
 - **Migrated to `github.com/redis/go-redis/v9`** from legacy v8
 - **Official Redis organization** library with active maintenance
 - **Enhanced connection pooling** and better Redis 7+ feature support
@@ -49,17 +53,23 @@ The OTP service has undergone significant performance improvements:
 
 **Method**: `POST`
 
-**Description**: Generates a one-time password (OTP) and stores it in Redis. The OTP is uniquely associated with a UUID that will be returned in the response.
+**Description**: Generates a one-time password (OTP) and stores it in Redis. The OTP is uniquely
+associated with a UUID that will be returned in the response.
 
 #### Request Parameters
 
 The following parameters can be sent via query string or in the request body as JSON.
 
-- `ttl` (optional, default: `60`): The time-to-live of the OTP in seconds. Must be between `1` and `3600`.
-- `retry_limit` (optional, default: `5`): The maximum number of times the OTP can be retried. Must be between `1` and `60`.
-- `code_length` (optional, default: `6`): The length of the OTP code. Must be between `1` and `10`.
-- `strict_validation` (optional, default: `false`): If set to `true`, the service will enforce strict validation of the request body during verification.
-- `use_alpha_numeric` (optional, default: `false`): If set to `true`, the OTP will contain letters and numbers; otherwise, only numbers.
+- `ttl` (optional, default: `60`): The time-to-live of the OTP in seconds.
+  Must be between `1` and `3600`.
+- `retry_limit` (optional, default: `5`): The maximum number of times the OTP can be retried.
+  Must be between `1` and `60`.
+- `code_length` (optional, default: `6`): The length of the OTP code.
+  Must be between `1` and `10`.
+- `strict_validation` (optional, default: `false`): If set to `true`, the service will enforce
+  strict validation of the request body during verification.
+- `use_alpha_numeric` (optional, default: `false`): If set to `true`, the OTP will contain
+  letters and numbers; otherwise, only numbers.
 
 #### Example Request
 
@@ -89,18 +99,18 @@ curl -X POST "http://localhost:8080" \
 
 **Description**: Verifies an OTP based on the UUID and OTP value provided.
 
-#### Request Parameters
+#### Verification Parameters
 
 - `uuid` (required): The UUID associated with the OTP that was generated.
 - `otp` (required): The OTP value to be verified.
 
-#### Example Request
+#### Verification Request Example
 
 ```bash
 curl -X GET "http://localhost:8080/?uuid=1c11604d-47fa-442a-866a-231686e14a8b&otp=447317"
 ```
 
-#### Example Response
+#### Verification Response Examples
 
 If the OTP is verified successfully:
 
@@ -128,13 +138,13 @@ If the OTP is invalid or expired:
 
 **Description**: Checks the health status of the service, including Redis connectivity.
 
-#### Example Request
+#### Health Check Request
 
 ```bash
 curl -X GET "http://localhost:8080/health"
 ```
 
-#### Example Response
+#### Health Check Response
 
 ```json
 {
@@ -149,11 +159,13 @@ curl -X GET "http://localhost:8080/health"
 
 ## Postman Collection
 
-You can find the Postman collection for this service [here](https://web.postman.co/workspace/be07ea85-299a-4d7f-a2c9-61cd33071f4b/collection/11658275-de41dacd-ab9b-4600-969d-2b62d60300c6).
+You can find the Postman collection for this service in the
+[OTP Service Workspace](https://web.postman.co/workspace/be07ea85-299a-4d7f-a2c9-61cd33071f4b/collection/11658275-de41dacd-ab9b-4600-969d-2b62d60300c6).
 
 ## Request Parameter Options
 
-The OTP service supports passing parameters via either the query string or request body (in JSON format). The following parameters can be used:
+The OTP service supports passing parameters via either the query string or request body
+(in JSON format). The following parameters can be used:
 
 - `ttl`: Time-to-live for OTP in seconds.
 - `retry_limit`: Maximum retries allowed.
@@ -200,12 +212,15 @@ Below is a guide for various status codes and their meanings:
 ## Additional Notes
 
 - Ensure Redis is running and configured properly for the OTP service to work.
-- The `strict_validation` parameter helps ensure the request data matches what was used during OTP generation, adding an extra layer of security.
-- The `retry_limit` parameter limits the number of incorrect attempts a user can make, providing basic protection against brute-force attacks.
+- The `strict_validation` parameter helps ensure the request data matches what was used during
+  OTP generation, adding an extra layer of security.
+- The `retry_limit` parameter limits the number of incorrect attempts a user can make, providing
+  basic protection against brute-force attacks.
 
 ### Examples of Requests with Strict Validation
 
-Below are examples of requests that demonstrate the use of the `strict_validation` parameter.
+Below are examples of requests that demonstrate the use of the `strict_validation`
+parameter.
 
 #### Example 1: Generate OTP with Strict Validation Disabled
 
@@ -270,12 +285,16 @@ curl --silent --location --request GET 'localhost:8080/?uuid=e63ee3c4-9ebe-42a3-
 
 ## Redis Configuration
 
-The OTP service utilizes multiple Redis indices for storing OTPs, as specified in the configuration file (`config.yaml`). The `REDIS.INDICES` configuration allows you to determine how many Redis databases are used to distribute OTPs.
+The OTP service utilizes multiple Redis indices for storing OTPs, as specified in the
+configuration file (`config.yaml`). The `REDIS.INDICES` configuration allows you to determine how
+many Redis databases are used to distribute OTPs.
 
 ### Redis Sharding Strategy
 
 - **Single Index**: You can specify a single Redis index (e.g., `0`) to store all OTPs in a single Redis database.
-- **Range of Indices**: You can specify a range of Redis indices (e.g., `0-3` or `2-5`). OTPs are distributed among the specified Redis databases using **UUID-based sharding** for optimal performance and distribution.
+- **Range of Indices**: You can specify a range of Redis indices (e.g., `0-3` or `2-5`).
+  OTPs are distributed among the specified Redis databases using **UUID-based sharding** for
+  optimal performance and distribution.
 
 #### How UUID-Based Sharding Works
 
@@ -286,30 +305,45 @@ The service uses an intelligent sharding algorithm that:
 3. **Applies modulo** with shard count to determine target database
 4. **Adds start offset** for ranges (e.g., for "2-5", adds 2 to result)
 
-**Example**: 
+**Example**:
+
 - UUID: `550e8400-e29b-41d4-a716-446655440000`
 - Last 4 bytes: `40000` (hex) = 262144 (decimal)
 - For range "0-3": `262144 % 4 + 0 = 0` → Database 0
 - For range "2-5": `262144 % 4 + 2 = 2` → Database 2
 
 This approach provides:
+
 - ✅ **Excellent distribution** - Uses UUID's inherent randomness
 - ✅ **High performance** - ~10x faster than SHA-256 hashing  
 - ✅ **Consistency** - Same UUID always maps to same database
 - ✅ **Load balancing** - Even distribution across all configured databases
 
-The `REDIS.INDICES` configuration is crucial for scaling the OTP service effectively, especially under high load. By distributing the OTPs across multiple Redis databases using this optimized algorithm, the service can handle more concurrent requests and reduce contention for Redis resources.
+The `REDIS.INDICES` configuration is crucial for scaling the OTP service effectively,
+especially under high load. By distributing the OTPs across multiple Redis databases using this
+optimized algorithm, the service can handle more concurrent requests and reduce contention for
+Redis resources.
 
-The `REDIS.KEY_PREFIX` configuration allows you to set a prefix for all Redis keys used by the service. This can be useful for namespacing keys, especially if you are using a shared Redis instance for multiple services. If left empty (`""`), no prefix will be added. Example: if the prefix is set to `"OTP"`, all keys will be stored as `"OTP:<key>"`.
+The `REDIS.KEY_PREFIX` configuration allows you to set a prefix for all Redis keys used by
+the service. This can be useful for namespacing keys, especially if you are using a shared
+Redis instance for multiple services. If left empty (`""`), no prefix will be added.
+Example: if the prefix is set to `"OTP"`, all keys will be stored as `"OTP:<key>"`.
 
-The `REDIS.TIMEOUT` configuration allows you to set a timeout for Redis connections. This is useful for ensuring that the service does not get stuck waiting for a Redis connection that is not responding. The default value is `5s`.
+The `REDIS.TIMEOUT` configuration allows you to set a timeout for Redis connections.
+This is useful for ensuring that the service does not get stuck waiting for a Redis connection
+that is not responding. The default value is `5s`.
 
 ### Configuration Parameters
 
-The OTP service also provides additional configuration parameters that can be adjusted in the `CONFIG` section of the configuration file.
+The OTP service also provides additional configuration parameters that can be adjusted in
+the `CONFIG` section of the configuration file.
 
-- **`CONFIG.HASH_KEY`**: If set to `true`, the Redis keys used to store OTPs are hashed using SHA-256. This helps to prevent any potential key collisions and makes the keys more secure. It is recommended to keep this value as `true` for production environments.
-- **`SERVER.MODE`**: Server mode can be set to `release` for production or `test` for development/testing. Test mode provides additional debugging information and exposes the OTP value in responses.
+- **`CONFIG.HASH_KEY`**: If set to `true`, the Redis keys used to store OTPs are hashed using
+  SHA-256. This helps to prevent any potential key collisions and makes the keys more secure.
+  It is recommended to keep this value as `true` for production environments.
+- **`SERVER.MODE`**: Server mode can be set to `release` for production or `test` for
+  development/testing. Test mode provides additional debugging information and exposes the OTP
+  value in responses.
 
 ## Technical Architecture
 
@@ -354,9 +388,11 @@ These improvements make the OTP service more robust, performant, and ready for p
 
 ## Development Roadmap
 
-The OTP service follows a strategic 5-phase development roadmap designed to evolve from a solid foundation into a comprehensive, enterprise-grade authentication platform:
+The OTP service follows a strategic 5-phase development roadmap designed to evolve from a solid
+foundation into a comprehensive, enterprise-grade authentication platform:
 
 ### **Phase 1: Core Foundation** ✅ **COMPLETED**
+
 - Production-ready OTP generation and verification
 - Comprehensive testing and security measures
 - Performance-optimized UUID-based sharding
@@ -385,7 +421,8 @@ The OTP service follows a strategic 5-phase development roadmap designed to evol
 - Predictive analytics and scaling
 - Next-generation protocol support
 
-**📋 Full Details**: See **[ROADMAP.md](ROADMAP.md)** for complete feature specifications, timelines, and technical architecture evolution plans.
+**📋 Full Details**: See **[ROADMAP.md](ROADMAP.md)** for complete feature specifications,
+timelines, and technical architecture evolution plans.
 
 ## Related Documentation
 
