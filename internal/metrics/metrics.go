@@ -7,18 +7,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Stats represents a snapshot of current metrics
-type Stats struct {
-	OTPGenerated  int64 `json:"otp_generated"`
-	OTPVerified   int64 `json:"otp_verified"`
-	OTPExpired    int64 `json:"otp_expired"`
-	OTPInvalid    int64 `json:"otp_invalid"`
-	RateLimited   int64 `json:"rate_limited"`
-	RedisErrors   int64 `json:"redis_errors"`
-	TotalRequests int64 `json:"total_requests"`
-	StartTime     int64 `json:"start_time"`
-}
-
 // Metrics holds application metrics
 type Metrics struct {
 	OTPGenerated  int64 `json:"otp_generated"`
@@ -72,22 +60,8 @@ func (m *Metrics) IncrementRedisErrors() {
 	atomic.AddInt64(&m.RedisErrors, 1)
 }
 
-// GetStats returns current metrics as Stats struct
-func (m *Metrics) GetStats() Stats {
-	return Stats{
-		OTPGenerated:  atomic.LoadInt64(&m.OTPGenerated),
-		OTPVerified:   atomic.LoadInt64(&m.OTPVerified),
-		OTPExpired:    atomic.LoadInt64(&m.OTPExpired),
-		OTPInvalid:    atomic.LoadInt64(&m.OTPInvalid),
-		RateLimited:   atomic.LoadInt64(&m.RateLimited),
-		RedisErrors:   atomic.LoadInt64(&m.RedisErrors),
-		TotalRequests: atomic.LoadInt64(&m.TotalRequests),
-		StartTime:     m.StartTime,
-	}
-}
-
-// GetStatsMap returns current metrics as map (for backward compatibility)
-func (m *Metrics) GetStatsMap() map[string]interface{} {
+// GetStats returns current metrics
+func (m *Metrics) GetStats() map[string]interface{} {
 	uptime := time.Now().Unix() - m.StartTime
 	return map[string]interface{}{
 		"otp_generated":  atomic.LoadInt64(&m.OTPGenerated),
@@ -102,13 +76,8 @@ func (m *Metrics) GetStatsMap() map[string]interface{} {
 	}
 }
 
-// GetUptime returns the uptime duration
-func (m *Metrics) GetUptime() time.Duration {
-	return time.Since(time.Unix(m.StartTime, 0))
-}
-
 // LogMetrics logs current metrics periodically
 func (m *Metrics) LogMetrics() {
-	stats := m.GetStatsMap()
+	stats := m.GetStats()
 	m.logger.WithFields(logrus.Fields(stats)).Info("Application metrics")
 }

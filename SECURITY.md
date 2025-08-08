@@ -50,21 +50,18 @@ We will acknowledge receipt of vulnerability reports within **48 hours** and aim
 When deploying the OTP Service, follow these security best practices:
 
 #### Environment Configuration
-
 - **Never commit secrets**: Keep API keys, passwords, and other sensitive data out of version control
 - **Use environment variables**: Store sensitive configuration in environment variables
 - **Secure Redis**: Configure Redis with authentication and network restrictions
 - **TLS/HTTPS**: Always use HTTPS in production environments
 
 #### Network Security
-
 - **Firewall rules**: Restrict network access to only necessary ports and IPs
 - **VPC/Private networks**: Deploy in private networks when possible
 - **Rate limiting**: Configure appropriate rate limits to prevent abuse
 - **Load balancing**: Use load balancers with proper health checks
 
 #### Monitoring
-
 - **Log monitoring**: Monitor logs for suspicious activity
 - **Metrics tracking**: Track OTP generation and verification patterns
 - **Alert systems**: Set up alerts for unusual behavior or errors
@@ -73,14 +70,12 @@ When deploying the OTP Service, follow these security best practices:
 ### For Developers
 
 #### Code Security
-
 - **Input validation**: Always validate and sanitize input parameters
 - **Error handling**: Handle errors gracefully without exposing sensitive information
 - **Dependency updates**: Keep dependencies updated to their latest secure versions
 - **Code reviews**: Conduct thorough security-focused code reviews
 
 #### Testing
-
 - **Security testing**: Include security tests in your test suites
 - **Penetration testing**: Perform regular penetration testing
 - **Dependency scanning**: Use tools to scan for vulnerable dependencies
@@ -91,7 +86,6 @@ When deploying the OTP Service, follow these security best practices:
 The OTP Service implements the following security measures:
 
 ### Application Security
-
 - **Input Validation**: Comprehensive validation of all input parameters
 - **Rate Limiting**: Built-in rate limiting to prevent abuse
 - **Secure Headers**: Security headers including HSTS, X-Frame-Options, etc.
@@ -99,14 +93,12 @@ The OTP Service implements the following security measures:
 - **OTP Generation**: Secure random OTP generation with configurable parameters
 
 ### Infrastructure Security
-
 - **Redis Security**: Support for Redis authentication and secure connections
 - **Connection Pooling**: Secure connection pooling with timeout configurations
 - **Error Handling**: Secure error handling that doesn't expose sensitive information
 - **Logging**: Security-conscious logging that doesn't log sensitive data
 
 ### Dependency Management
-
 - **Regular Updates**: Proactive monitoring and updating of dependencies
 - **Security Scanning**: Regular scanning for known vulnerabilities
 - **Minimal Dependencies**: Using only necessary dependencies to reduce attack surface
@@ -114,7 +106,6 @@ The OTP Service implements the following security measures:
 ## Recent Security Updates
 
 ### 2024-12 Security Patch
-
 - **Fixed**: IPv6 Zone ID HTTP Proxy Bypass vulnerability in golang.org/x/net
 - **Fixed**: Cross-site Scripting vulnerability in golang.org/x/net  
 - **Fixed**: Denial of Service vulnerability in golang.org/x/crypto
@@ -125,13 +116,11 @@ The OTP Service implements the following security measures:
 ## Security Resources
 
 ### Documentation
-
 - [OWASP API Security Top 10](https://owasp.org/www-project-api-security/)
 - [Go Security Best Practices](https://github.com/OWASP/Go-SCP)
 - [Redis Security Guidelines](https://redis.io/docs/management/security/)
 
 ### Tools
-
 - [Gosec](https://github.com/securecodewarrior/gosec) - Go security analyzer
 - [Nancy](https://github.com/sonatypecommunity/nancy) - Dependency vulnerability scanner
 - [Trivy](https://github.com/aquasecurity/trivy) - Container and dependency scanner

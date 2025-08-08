@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"math"
 	"math/big"
 	"net/http"
 	"os"
@@ -24,18 +23,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-
-	"otp-service/internal/admin"
-	"otp-service/internal/metrics"
 )
 
 var (
-	logger           = logrus.New()
-	cfg              Config
-	ctx              = context.Background()
-	redisClient      *redis.Client
-	metricsService   *metrics.Metrics
-	adminIntegration *admin.AdminIntegration
+	logger      = logrus.New()
+	cfg         Config
+	ctx         = context.Background()
+	redisClient *redis.Client
 )
 
 // ShardConfig caches parsed shard configuration for performance
@@ -77,13 +71,6 @@ type Config struct {
 	Config struct {
 		HashKeys bool `mapstructure:"hash_keys"`
 	} `mapstructure:"config"`
-	Admin struct {
-		Enabled     bool     `mapstructure:"enabled"`
-		JWTSecret   string   `mapstructure:"jwt_secret"`
-		AllowedIPs  []string `mapstructure:"allowed_ips"`
-		BasicAuth   bool     `mapstructure:"basic_auth"`
-		RequireAuth bool     `mapstructure:"require_auth"`
-	} `mapstructure:"admin"`
 }
 
 const (
@@ -211,20 +198,6 @@ func init() {
 
 	// Initialize Redis client
 	initRedis()
-
-	// Initialize metrics service
-	metricsService = metrics.NewMetrics(logger)
-
-	// Initialize admin integration
-	adminConfig := admin.Config{
-		Enabled:     cfg.Admin.Enabled,
-		JWTSecret:   cfg.Admin.JWTSecret,
-		AllowedIPs:  cfg.Admin.AllowedIPs,
-		BasicAuth:   cfg.Admin.BasicAuth,
-		RequireAuth: cfg.Admin.RequireAuth,
-		ServerMode:  cfg.Server.Mode,
-	}
-	adminIntegration = admin.NewAdminIntegrationWithMode(metricsService, logger, adminConfig, cfg.Server.Mode)
 
 	logger.SetLevel(logrus.InfoLevel)
 
@@ -368,17 +341,15 @@ func getShardIndex(uuid string) int {
 	
 	lastBytes := cleaned[len(cleaned)-8:] // Last 4 bytes as hex string
 	
-	// Convert hex to int32 for modulo operation, with bounds check
+	// Convert hex to uint32 for modulo operation
 	hash, err := strconv.ParseUint(lastBytes, 16, 32)
 	if err != nil {
 		// Fallback for parse errors
 		return shardConfig.startIndex
 	}
-	if hash > uint64(math.MaxInt32) {
-		// Fallback for out-of-bounds values
-		return shardConfig.startIndex
-	}
-	shardOffset := int(int32(hash)) % shardConfig.shardCount
+	
+	// Safe conversion: hash is guaranteed to fit in uint32, then convert to int
+	shardOffset := int(uint32(hash)) % shardConfig.shardCount
 	return shardConfig.startIndex + shardOffset
 }
 
@@ -462,7 +433,6 @@ func delOTPFromRedis(uuid string) error {
 func generateOTPHandler(c *gin.Context) {
 	clientID := c.ClientIP()
 	if isRateLimited(clientID) {
-		metricsService.IncrementRateLimited()
 		sendAPIResponse(c, http.StatusTooManyRequests, StatusRateLimitExceeded, nil)
 		return
 	}
@@ -546,7 +516,6 @@ func generateOTPHandler(c *gin.Context) {
 		"length":    otpRequest.CodeLength,
 	}).Info("OTP generated successfully")
 
-	metricsService.IncrementOTPGenerated()
 	sendAPIResponse(c, http.StatusOK, StatusOTPGenerated, responseData)
 }
 
@@ -577,7 +546,6 @@ func verifyOTPHandler(c *gin.Context) {
 	// Get OTP data from Redis
 	otpData, err := getOTPFromRedis(requestUUID)
 	if err != nil {
-		metricsService.IncrementOTPExpired()
 		sendAPIResponse(c, http.StatusUnauthorized, StatusOTPExpired, nil)
 		return
 	}
@@ -600,7 +568,6 @@ func verifyOTPHandler(c *gin.Context) {
 
 	// Check OTP case-insensitively if alphanumeric
 	if !strings.EqualFold(otpData.OTP, userInputOTP) {
-		metricsService.IncrementOTPInvalid()
 		if err := updateRetryLimitInRedis(requestUUID, otpData); err != nil {
 			sendAPIResponse(c, http.StatusInternalServerError, StatusOTPInvalid, nil)
 			return
@@ -664,7 +631,6 @@ func verifyOTPHandler(c *gin.Context) {
 			},
 		}
 	}
-	metricsService.IncrementOTPVerified()
 	sendAPIResponse(c, http.StatusOK, StatusOTPVerified, responseData)
 }
 
@@ -772,21 +738,6 @@ func main() {
 		sendAPIResponse(c, http.StatusOK, StatusServiceHealth, responseData)
 	})
 
-	// Metrics endpoint
-	r.GET("/metrics", func(c *gin.Context) {
-		stats := metricsService.GetStatsMap()
-		sendAPIResponse(c, http.StatusOK, "METRICS", stats)
-	})
-
-	// Setup admin routes
-	adminIntegration.SetupAdminRoutes(r, admin.Config{
-		Enabled:     cfg.Admin.Enabled,
-		JWTSecret:   cfg.Admin.JWTSecret,
-		AllowedIPs:  cfg.Admin.AllowedIPs,
-		BasicAuth:   cfg.Admin.BasicAuth,
-		RequireAuth: cfg.Admin.RequireAuth,
-	})
-
 	// Set up HTTP server with timeouts
 	server := &http.Server{
 		Addr:              fmt.Sprintf("%s:%s", cfg.Server.Host, cfg.Server.Port),
@@ -818,89 +769,8 @@ func main() {
 		}
 	}()
 
-	// Log comprehensive startup information
-	protocol := "http"
-	if cfg.Server.TLS.Enabled {
-		protocol = "https"
-	}
-	
-	logger.Info("==========================================")
-	logger.Info("🔐 OTP Service - Production Ready")
-	logger.Info("==========================================")
-	logger.Infof("📡 Server URL: %s://%s", protocol, server.Addr)
-	logger.Info("")
-	logger.Info("📋 Available Endpoints:")
-	logger.Infof("   ├─ POST %s://localhost:%s/          - Generate OTP", protocol, cfg.Server.Port)
-	logger.Infof("   ├─ GET  %s://localhost:%s/?uuid=...  - Verify OTP", protocol, cfg.Server.Port)
-	logger.Infof("   ├─ GET  %s://localhost:%s/health     - Health Check", protocol, cfg.Server.Port)
-	logger.Infof("   └─ GET  %s://localhost:%s/metrics    - System Metrics", protocol, cfg.Server.Port)
-	logger.Info("")
-	
-	// Admin panel information
-	if cfg.Admin.Enabled {
-		logger.Info("🎛️  Admin Dashboard:")
-		logger.Infof("   ├─ Dashboard: %s://localhost:%s/admin/", protocol, cfg.Server.Port)
-		logger.Infof("   ├─ Login:     %s://localhost:%s/admin/login", protocol, cfg.Server.Port)
-		logger.Info("   ├─ Features:")
-		logger.Info("   │  ├─ 📊 Real-time Analytics")
-		logger.Info("   │  ├─ 📈 Interactive Charts")
-		logger.Info("   │  ├─ 📋 Live Activity Feed")
-		logger.Info("   │  └─ 🔍 System Health Monitoring")
-		logger.Info("   └─ Security:")
-		if cfg.Admin.RequireAuth {
-			if cfg.Admin.BasicAuth {
-				logger.Info("      ├─ 🔐 Basic Authentication Enabled")
-			} else {
-				logger.Info("      ├─ 🔐 JWT Authentication Enabled")
-			}
-		} else {
-			logger.Warn("      ⚠️  Authentication DISABLED (Development Only!)")
-		}
-		
-		if len(cfg.Admin.AllowedIPs) > 0 {
-			logger.Infof("      ├─ 🛡️  IP Whitelist: %v", cfg.Admin.AllowedIPs)
-		}
-		logger.Info("      └─ 🚦 Rate Limiting Enabled")
-		logger.Info("")
-		
-		// Admin credentials warning
-		if cfg.Admin.RequireAuth {
-			if cfg.Server.Mode == "test" || cfg.Server.Mode == "development" {
-				logger.Warn("🔑 Using Default Admin Credentials - CHANGE IN PRODUCTION!")
-				logger.Warn("   └─ Review admin configuration in production deployments")
-			} else {
-				logger.Info("🔑 Admin Authentication: ✅ Enabled")
-				logger.Info("   └─ Ensure strong credentials are configured")
-			}
-		}
-	} else {
-		logger.Warn("⚠️  Admin Dashboard DISABLED")
-	}
-	
-	logger.Info("")
-	logger.Info("⚙️  Configuration:")
-	logger.Infof("   ├─ Server Mode: %s", cfg.Server.Mode)
-	if cfg.Server.Mode == "test" {
-		logger.Infof("   ├─ Admin Auth Required: %v", cfg.Admin.RequireAuth)
-		logger.Infof("   ├─ Admin IPs: %v", cfg.Admin.AllowedIPs)
-	}
-	logger.Infof("   ├─ Redis: %s:%s", cfg.Redis.Host, cfg.Redis.Port)
-	if cfg.Redis.Indices != "" {
-		logger.Infof("   ├─ Redis Sharding: %s", cfg.Redis.Indices)
-	}
-	logger.Infof("   ├─ Key Hashing: %v", cfg.Config.HashKeys)
-	if cfg.Server.TLS.Enabled {
-		logger.Infof("   ├─ TLS/SSL: ✅ Enabled")
-		logger.Infof("   │  ├─ Cert: %s", cfg.Server.TLS.CertFile)
-		logger.Infof("   │  └─ Key:  %s", cfg.Server.TLS.KeyFile)
-	} else {
-		logger.Info("   ├─ TLS/SSL: ❌ Disabled")
-	}
-	logger.Info("   └─ Security Headers: ✅ Enabled")
-	logger.Info("")
-	logger.Info("🚀 Server Starting...")
-	logger.Info("==========================================")
-	
+	// Start server
+	logger.Infof("Starting server on %s", server.Addr)
 	if cfg.Server.TLS.Enabled {
 		if err := server.ListenAndServeTLS("", ""); err != http.ErrServerClosed {
 			handleFatalError("Failed to start server", err)
