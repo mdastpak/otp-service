@@ -3,16 +3,16 @@
 # See .env for all available environment variables
 
 redis:
-  host: "localhost"                    # Override with REDIS_HOST
-  port: "6379"                        # Override with REDIS_PORT  
-  password: ""                        # Override with REDIS_PASSWORD
-  indices: "0-5"                      # Override with REDIS_INDICES
-  key_prefix: ""                      # Override with REDIS_KEY_PREFIX (can be empty)
-  timeout: 5                          # Override with REDIS_TIMEOUT
+  host: "localhost"                  # Override with REDIS_HOST
+  port: 6379                         # Override with REDIS_PORT  
+  password: ""                       # Override with REDIS_PASSWORD
+  indices: "0-5"                     # Override with REDIS_INDICES
+  key_prefix: ""                     # Override with REDIS_KEY_PREFIX (empty string disables prefix)
+  timeout: 5                         # Override with REDIS_TIMEOUT
 
 server:
-  host: "localhost"                   # Override with SERVER_HOST
-  port: "8080"                       # Override with SERVER_PORT
+  host: "localhost"                  # Override with SERVER_HOST
+  port: 8080                         # Override with SERVER_PORT
   mode: "test"                       # Override with SERVER_MODE (release/test)
   timeout:
     read: 5                          # Override with SERVER_TIMEOUT_READ
@@ -21,10 +21,9 @@ server:
     read_header: 2                   # Override with SERVER_TIMEOUT_READ_HEADER
   tls: 
     enabled: false                   # Override with TLS_ENABLED
-    cert_file: "cert.pem"           # Override with TLS_CERT_FILE
-    key_file: "key.pem"             # Override with TLS_KEY_FILE
-    client_certs: "client_certs.pem" # Override with TLS_CLIENT_CERTS
+    cert_file: "cert.pem"            # Override with TLS_CERT_FILE
+    key_file: "key.pem"              # Override with TLS_KEY_FILE
+    client_certs: "client_certs.pem" # Override with TLS_CLIENT_CERTS; leave empty or omit to disable mutual TLS
 
 config:
-  hash_keys: true                    # Override with HASH_KEYS
-
+  hash_keys: true                    # Hash Redis keys for obfuscation; override with HASH_KEYS
