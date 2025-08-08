@@ -675,8 +675,6 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 
 	switch cfg.Server.Mode {
-	case "debug":
-		gin.SetMode(gin.DebugMode)
 	case "test":
 		gin.SetMode(gin.TestMode)
 	}
@@ -714,10 +712,7 @@ func main() {
 			"config":       "***********",
 			"server_mode":  cfg.Server.Mode,
 		}
-		switch cfg.Server.Mode {
-		case "debug":
-			responseData["config"] = cfg
-		case "test":
+		if cfg.Server.Mode == "test" {
 			responseData["test_mode"] = true
 			responseData["debug_features"] = map[string]interface{}{
 				"otp_visible_in_generation": true,

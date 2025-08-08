@@ -20,11 +20,6 @@ func TestSetupLogger(t *testing.T) {
 			expected: logrus.InfoLevel,
 		},
 		{
-			name:     "Debug mode",
-			mode:     "debug",
-			expected: logrus.TraceLevel,
-		},
-		{
 			name:     "Test mode",
 			mode:     "test",
 			expected: logrus.TraceLevel,
@@ -45,7 +40,7 @@ func TestLoadConfig_WithEnvVars(t *testing.T) {
 	// Set environment variables
 	os.Setenv("REDIS_HOST", "test-redis")
 	os.Setenv("REDIS_PORT", "6380")
-	os.Setenv("SERVER_MODE", "debug")
+	os.Setenv("SERVER_MODE", "test")
 	defer func() {
 		os.Unsetenv("REDIS_HOST")
 		os.Unsetenv("REDIS_PORT")
