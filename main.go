@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
@@ -565,8 +566,13 @@ func verifyOTPHandler(c *gin.Context) {
 		return
 	}
 
-	// Check OTP case-insensitively if alphanumeric
-	if !strings.EqualFold(otpData.OTP, userInputOTP) {
+	// Check OTP using constant-time comparison to prevent timing attacks
+	// For case-insensitive comparison, normalize both strings first
+	storedOTP := strings.ToUpper(otpData.OTP)
+	inputOTP := strings.ToUpper(userInputOTP)
+	
+	// Use constant-time comparison
+	if subtle.ConstantTimeCompare([]byte(storedOTP), []byte(inputOTP)) != 1 {
 		if err := updateRetryLimitInRedis(requestUUID, otpData); err != nil {
 			sendAPIResponse(c, http.StatusInternalServerError, StatusOTPInvalid, nil)
 			return
@@ -675,8 +681,6 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 
 	switch cfg.Server.Mode {
-	case "debug":
-		gin.SetMode(gin.DebugMode)
 	case "test":
 		gin.SetMode(gin.TestMode)
 	}
@@ -684,6 +688,8 @@ func main() {
 	r := gin.New()
 	r.Use(
 		gin.Recovery(),
+		corsMiddleware(),
+		requestSizeLimitMiddleware(),
 		securityHeadersMiddleware(),
 	)
 
@@ -714,10 +720,7 @@ func main() {
 			"config":       "***********",
 			"server_mode":  cfg.Server.Mode,
 		}
-		switch cfg.Server.Mode {
-		case "debug":
-			responseData["config"] = cfg
-		case "test":
+		if cfg.Server.Mode == "test" {
 			responseData["test_mode"] = true
 			responseData["debug_features"] = map[string]interface{}{
 				"otp_visible_in_generation": true,
@@ -737,7 +740,7 @@ func main() {
 		sendAPIResponse(c, http.StatusOK, StatusServiceHealth, responseData)
 	})
 
-	// Set up HTTP server with timeouts
+	// Set up HTTP server with timeouts and size limits
 	server := &http.Server{
 		Addr:              fmt.Sprintf("%s:%s", cfg.Server.Host, cfg.Server.Port),
 		Handler:           r,
@@ -746,6 +749,7 @@ func main() {
 		WriteTimeout:      time.Duration(cfg.Server.Timeout.Write) * time.Second,
 		IdleTimeout:       time.Duration(cfg.Server.Timeout.Idle) * time.Second,
 		ReadHeaderTimeout: time.Duration(cfg.Server.Timeout.ReadHeader) * time.Second,
+		MaxHeaderBytes:    1 << 20, // 1MB max header size
 	}
 
 	// Graceful shutdown
@@ -778,6 +782,64 @@ func main() {
 		if err := server.ListenAndServe(); err != http.ErrServerClosed {
 			handleFatalError("Failed to start server", err)
 		}
+	}
+}
+
+// requestSizeLimitMiddleware limits request body size to prevent resource exhaustion
+func requestSizeLimitMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Limit request body size to 1MB to prevent resource exhaustion
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 1024*1024)
+		c.Next()
+	}
+}
+
+// corsMiddleware adds CORS headers to prevent CSRF attacks
+func corsMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		origin := c.Request.Header.Get("Origin")
+		
+		// In production, define specific allowed origins
+		// For development/test, allow localhost
+		allowedOrigins := []string{
+			"http://localhost:3000",
+			"http://localhost:8080",
+			"https://localhost:3000",
+			"https://localhost:8080",
+		}
+		
+		// Only allow specific origins
+		allowed := false
+		for _, allowedOrigin := range allowedOrigins {
+			if origin == allowedOrigin {
+				allowed = true
+				break
+			}
+		}
+		
+		if allowed {
+			c.Header("Access-Control-Allow-Origin", origin)
+		}
+		
+		// Define allowed methods
+		c.Header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		
+		// Define allowed headers
+		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+		
+		// Define allowed credentials
+		c.Header("Access-Control-Allow-Credentials", "true")
+		
+		// Max age for preflight
+		c.Header("Access-Control-Max-Age", "86400")
+		
+		// Handle preflight requests
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+		
+		c.Next()
 	}
 }
 
