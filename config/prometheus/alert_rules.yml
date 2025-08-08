@@ -1,0 +1,119 @@
+# Prometheus Alert Rules for OTP Service
+
+groups:
+  - name: otp-service.rules
+    interval: 30s
+    rules:
+      # Service availability alerts
+      - alert: OTPServiceDown
+        expr: up{job="otp-service"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: otp-service
+        annotations:
+          summary: "OTP Service is down"
+          description: "OTP Service {{ $labels.instance }} has been down for more than 1 minute"
+
+      - alert: OTPServiceHighErrorRate
+        expr: (rate(http_requests_total{job="otp-service",status=~"5.."}[5m]) / rate(http_requests_total{job="otp-service"}[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          service: otp-service
+        annotations:
+          summary: "High error rate on OTP Service"
+          description: "Error rate is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+
+      - alert: OTPServiceHighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="otp-service"}[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: otp-service
+        annotations:
+          summary: "High latency on OTP Service"
+          description: "95th percentile latency is {{ $value }}s on {{ $labels.instance }}"
+
+      # Redis alerts
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: redis
+        annotations:
+          summary: "Redis is down"
+          description: "Redis {{ $labels.instance }} has been down for more than 1 minute"
+
+      - alert: RedisHighMemoryUsage
+        expr: (redis_memory_used_bytes / redis_memory_max_bytes) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "Redis high memory usage"
+          description: "Redis memory usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+
+      - alert: RedisConnectionsHigh
+        expr: redis_connected_clients > 100
+        for: 5m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "High number of Redis connections"
+          description: "{{ $value }} connections on Redis {{ $labels.instance }}"
+
+      # System resource alerts
+      - alert: HighCPUUsage
+        expr: (100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)) > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}% on {{ $labels.instance }}"
+
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+
+      - alert: DiskSpaceLow
+        expr: (1 - (node_filesystem_avail_bytes{fstype!="tmpfs"} / node_filesystem_size_bytes{fstype!="tmpfs"})) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "Low disk space"
+          description: "Disk usage is {{ $value | humanizePercentage }} on {{ $labels.instance }} {{ $labels.mountpoint }}"
+
+      # OTP-specific alerts
+      - alert: OTPGenerationFailureRate
+        expr: (rate(otp_generation_failures_total[5m]) / rate(otp_generation_total[5m])) > 0.01
+        for: 2m
+        labels:
+          severity: warning
+          service: otp-service
+        annotations:
+          summary: "High OTP generation failure rate"
+          description: "OTP generation failure rate is {{ $value | humanizePercentage }}"
+
+      - alert: OTPVerificationFailureRate
+        expr: (rate(otp_verification_failures_total[5m]) / rate(otp_verification_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          service: otp-service
+        annotations:
+          summary: "High OTP verification failure rate"
+          description: "OTP verification failure rate is {{ $value | humanizePercentage }}"

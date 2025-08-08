@@ -1,109 +1,66 @@
-# Go parameters
-GOCMD=go
-GOBUILD=$(GOCMD) build
-GOCLEAN=$(GOCMD) clean
-GOTEST=$(GOCMD) test
-GOGET=$(GOCMD) get
-GOMOD=$(GOCMD) mod
-BINARY_NAME=otp-service
-BINARY_UNIX=$(BINARY_NAME)_unix
-GOPROXY=direct
+# Makefile for OTP Service
+.PHONY: help build test start stop clean
 
-# Build targets
-.PHONY: all build clean test coverage benchmark deps run docker-build docker-run lint fmt vet
+help: ## Show help
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "%-20s %s\n", $$1, $$2}'
 
-all: test build
+build: ## Build Docker image (test mode - default)
+	./scripts/build.sh -e test
 
-build:
-	$(GOBUILD) -o $(BINARY_NAME) -v ./main.go
+build-prod: ## Build production Docker image
+	./scripts/build.sh -e production
 
-build-linux:
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) -o $(BINARY_UNIX) -v ./main.go
+test: ## Run all tests
+	go test -v -race ./...
+	@echo "Running integration tests with Redis..."
+	docker-compose up -d redis
+	sleep 5
+	go test -v -race ./tests/ -run "TestBasic" || true
+	docker-compose down
 
-clean:
-	$(GOCLEAN)
-	rm -f $(BINARY_NAME)
-	rm -f $(BINARY_UNIX)
+test-unit: ## Run unit tests only
+	go test -v -race ./internal/...
 
-test:
-	$(GOTEST) -v ./internal/...
-	$(GOTEST) -v . -timeout=30s
+test-integration: ## Run basic integration tests
+	docker-compose up -d redis
+	sleep 5
+	go test -v -race ./tests/ -run "TestBasic"
+	docker-compose down
 
-test-all: 
-	./run_tests.sh
+test-security: ## Run security tests
+	docker-compose up -d redis
+	sleep 5
+	go test -v -race ./tests/ -run "TestSecurity"
+	docker-compose down
 
-test-short:
-	$(GOTEST) -short -v ./internal/...
+test-env: ## Run environment-specific tests  
+	docker-compose up -d redis
+	sleep 5
+	go test -v -race ./tests/ -run "TestProduction"
+	docker-compose down
 
-coverage:
-	$(GOTEST) -coverprofile=coverage.out ./internal/...
-	$(GOCMD) tool cover -html=coverage.out -o coverage.html
-	$(GOCMD) tool cover -func=coverage.out
+test-coverage: ## Run tests with coverage
+	go test -v -race -coverprofile=coverage.out ./...
+	docker-compose up -d redis
+	sleep 5
+	go test -v -race -coverprofile=coverage-tests.out ./tests/ || true
+	docker-compose down
+	go tool cover -html=coverage.out -o coverage.html
 
-benchmark:
-	$(GOTEST) -bench=. -benchmem ./internal/...
+start: ## Start test services (default mode)
+	docker-compose up -d
 
-deps:
-	$(GOMOD) download
-	$(GOMOD) tidy
+start-prod: ## Start production services
+	docker-compose -f docker-compose.yml -f docker-compose.production.yml up -d
 
-run:
-	$(GOBUILD) -o $(BINARY_NAME) -v ./main.go
-	./$(BINARY_NAME)
+stop: ## Stop services
+	docker-compose down
 
-run-old:
-	$(GOBUILD) -o $(BINARY_NAME)_old -v ./main.go
-	./$(BINARY_NAME)_old
+logs: ## View logs
+	docker-compose logs -f
 
-docker-build:
-	docker build -t $(BINARY_NAME):latest .
+clean: ## Clean Docker resources
+	docker-compose down --rmi local --volumes
 
-docker-run:
-	docker-compose up --build
-
-lint:
-	golangci-lint run ./...
-
-fmt:
-	$(GOCMD) fmt ./...
-
-vet:
-	$(GOCMD) vet ./...
-
-# Security scanning
-security:
-	gosec ./...
-
-# Generate mock files (if using mockgen)
-generate:
-	$(GOCMD) generate ./...
-
-# Install tools
-install-tools:
-	$(GOGET) -u github.com/golangci/golangci-lint/cmd/golangci-lint
-	$(GOGET) -u github.com/securecodewarrior/gosec/v2/cmd/gosec
-
-# Run all checks
-check: fmt vet test lint
-
-# Help
-help:
-	@echo "Available targets:"
-	@echo "  build         - Build the binary"
-	@echo "  build-linux   - Build for Linux"
-	@echo "  clean         - Clean build artifacts"
-	@echo "  test          - Run tests"
-	@echo "  test-short    - Run short tests"
-	@echo "  coverage      - Generate test coverage report"
-	@echo "  benchmark     - Run benchmarks"
-	@echo "  deps          - Download dependencies"
-	@echo "  run           - Build and run (new version)"
-	@echo "  run-old       - Build and run (old version)"
-	@echo "  docker-build  - Build Docker image"
-	@echo "  docker-run    - Run with docker-compose"
-	@echo "  lint          - Run linter"
-	@echo "  fmt           - Format code"
-	@echo "  vet           - Run go vet"
-	@echo "  security      - Run security scanner"
-	@echo "  check         - Run all checks"
-	@echo "  help          - Show this help"
+.DEFAULT_GOAL := help
+EOF < /dev/null

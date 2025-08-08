@@ -1,0 +1,107 @@
+# Default Docker Compose configuration for OTP Service (Test Mode)
+# This is the default test/development mode
+# For production: docker-compose -f docker-compose.yml -f docker-compose.production.yml up
+
+services:
+  # =============================================================================
+  # OTP Service (Test Mode - Default)
+  # =============================================================================
+  otp-service:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    image: otp-service:${BUILD_VERSION:-dev}
+    ports:
+      - "8080:8080"  # Development/test port for CORS
+      - "9090:9090"  # Metrics port
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      ENVIRONMENT: test
+    env_file:
+      - .env.test
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - otp-network
+    volumes:
+      - ./logs:/app/logs
+      - ./config:/app/config:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+    labels:
+      - "service=otp-service"
+      - "environment=test"
+
+  # =============================================================================
+  # Redis Database (Test Mode)
+  # =============================================================================
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"  # Expose Redis directly in test mode
+    command: >
+      redis-server 
+      --save ""
+      --appendonly no
+      --loglevel debug
+      --maxmemory 128mb
+      --maxmemory-policy allkeys-lru
+    restart: unless-stopped
+    networks:
+      - otp-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 2s
+      retries: 3
+      start_period: 3s
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 32M
+    volumes:
+      - redis-test-data:/data
+    labels:
+      - "service=redis"
+      - "environment=test"
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  otp-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  redis-test-data:
+    driver: local

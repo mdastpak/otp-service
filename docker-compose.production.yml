@@ -1,0 +1,244 @@
+# Production environment override
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.production.yml up
+
+# Production environment overrides
+
+services:
+  # =============================================================================
+  # Load Balancer (HAProxy)
+  # =============================================================================
+  load-balancer:
+    image: haproxy:2.8-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8404:8404"  # HAProxy stats
+    volumes:
+      - ./config/haproxy:/usr/local/etc/haproxy:ro
+      - ./certs:/certs:ro
+      - haproxy-socket:/var/lib/haproxy
+    depends_on:
+      - otp-service
+    restart: unless-stopped
+    networks:
+      - otp-network
+      - public
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 32M
+    labels:
+      - "service=haproxy"
+      - "environment=production"
+
+  # =============================================================================
+  # OTP Service (Production with replicas)
+  # =============================================================================
+  otp-service:
+    build:
+      args:
+        BUILD_MODE: production
+    env_file:
+      - .env.production
+    ports: []  # Remove direct port exposure
+    expose:
+      - "8080"
+      - "9090"  # Metrics
+    volumes:
+      - ./logs:/logs
+      - ./certs:/certs:ro
+      - ./config:/config:ro
+    environment:
+      - ENVIRONMENT=production
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 256M
+        reservations:
+          cpus: '0.5'
+          memory: 128M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        order: start-first
+    healthcheck:
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.otp.rule=Host(`api.yourapp.com`)"
+      - "traefik.http.services.otp.loadbalancer.server.port=8080"
+
+  # =============================================================================
+  # Redis (Production with persistence)
+  # =============================================================================
+  redis:
+    command: >
+      redis-server 
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --stop-writes-on-bgsave-error yes
+      --rdbcompression yes
+      --rdbchecksum yes
+      --loglevel notice
+      --maxmemory 512mb
+      --maxmemory-policy volatile-lru
+      --tcp-keepalive 300
+      --timeout 0
+      --databases 16
+      --appendonly yes
+      --appendfsync everysec
+      --no-appendfsync-on-rewrite no
+      --auto-aof-rewrite-percentage 100
+      --auto-aof-rewrite-min-size 64mb
+    ports: []  # Remove external port exposure
+    volumes:
+      - redis-prod-data:/data
+      - ./config/redis:/usr/local/etc/redis:ro
+    environment:
+      - REDIS_DISABLE_COMMANDS=CONFIG,DEBUG,EVAL,FLUSHALL,FLUSHDB,SHUTDOWN
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    healthcheck:
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # =============================================================================
+  # Redis Exporter (Monitoring)
+  # =============================================================================
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    ports:
+      - "9121:9121"
+    environment:
+      - REDIS_ADDR=redis://redis:6379
+      - REDIS_EXPORTER_LOG_FORMAT=json
+    depends_on:
+      - redis
+    networks:
+      - otp-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 64M
+        reservations:
+          cpus: '0.05'
+          memory: 32M
+
+  # =============================================================================
+  # Prometheus (Metrics Collection)
+  # =============================================================================
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus:/etc/prometheus:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    networks:
+      - otp-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 256M
+
+  # =============================================================================
+  # Grafana (Monitoring Dashboard)
+  # =============================================================================
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_DOMAIN=${GRAFANA_DOMAIN:-localhost}
+      - GF_SMTP_ENABLED=true
+      - GF_SMTP_HOST=${SMTP_HOST}
+      - GF_SMTP_USER=${SMTP_USER}
+      - GF_SMTP_PASSWORD=${SMTP_PASSWORD}
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./config/grafana:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+    networks:
+      - otp-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+
+# =============================================================================
+# Additional Networks
+# =============================================================================
+networks:
+  public:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.21.0.0/16
+
+# =============================================================================
+# Production Volumes
+# =============================================================================
+volumes:
+  redis-prod-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/otp-service/data/redis
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+  haproxy-socket:
+    driver: local
