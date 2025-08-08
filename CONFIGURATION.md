@@ -11,22 +11,28 @@ The OTP service uses a **unified configuration approach** with environment varia
 
 ## Files Overview
 
-### 📄 `.env` 
+### 📄 `.env`
+
 Default configuration for local development
+
 ```bash
 cp .env.example .env
 # Edit .env with your local settings
 ```
 
 ### 📄 `.env.docker`
+
 Docker-specific configuration (used by docker-compose)
+
 - Automatically sets `REDIS_HOST=redis`
 - Sets `SERVER_HOST=0.0.0.0` for container networking
 
 ### 📄 `.env.example`
+
 Template file showing all available configuration options
 
 ### 📄 `config.yaml`
+
 - Provides fallback defaults
 - Documents all configuration options
 - Used when environment variables are not set
@@ -34,6 +40,7 @@ Template file showing all available configuration options
 ## Usage
 
 ### Local Development
+
 ```bash
 # Copy template
 cp .env.example .env
@@ -46,6 +53,7 @@ go run main.go
 ```
 
 ### Docker Development  
+
 ```bash
 # Uses .env.docker automatically
 docker-compose up
@@ -55,6 +63,7 @@ docker-compose --profile monitoring up
 ```
 
 ### Production
+
 Set environment variables directly or use your deployment platform's configuration system.
 
 ## Configuration Options
@@ -83,11 +92,13 @@ Set environment variables directly or use your deployment platform's configurati
 ## Migration from Old Setup
 
 The previous setup used:
+
 - Inline environment variables in docker-compose
 - Separate config files
 - Hardcoded values
 
 **New unified approach benefits:**
+
 - ✅ Single source of truth (`.env`)
 - ✅ Environment-specific overrides
 - ✅ Better documentation
