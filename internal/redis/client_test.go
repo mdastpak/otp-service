@@ -6,6 +6,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"otp-service/internal/config"
 	"otp-service/internal/models"
@@ -88,10 +89,12 @@ func TestGetShardIndex(t *testing.T) {
 			cfg.Redis.Indices = tt.indices
 
 			logger := logrus.New()
+			shardConfig, err := initShardConfig(cfg)
+			require.NoError(t, err)
 			client := &Client{
 				config:      cfg,
 				logger:      logger,
-				shardConfig: initShardConfig(cfg),
+				shardConfig: shardConfig,
 			}
 
 			// Should not panic
@@ -142,9 +145,12 @@ func BenchmarkGetShardIndex(b *testing.B) {
 	cfg.Redis.Indices = "0-15"
 
 	logger := logrus.New()
+	shardConfig, err := initShardConfig(cfg)
+	require.NoError(b, err)
 	client := &Client{
-		config: cfg,
-		logger: logger,
+		config:      cfg,
+		logger:      logger,
+		shardConfig: shardConfig,
 	}
 
 	b.ResetTimer()
@@ -181,10 +187,12 @@ func TestShardIndexConsistency(t *testing.T) {
 	cfg.Redis.Indices = "0-7"
 
 	logger := logrus.New()
+	shardConfig, err := initShardConfig(cfg)
+	require.NoError(t, err)
 	client := &Client{
 		config:      cfg,
 		logger:      logger,
-		shardConfig: initShardConfig(cfg),
+		shardConfig: shardConfig,
 	}
 
 	uuid := "consistent-test-uuid"
