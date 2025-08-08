@@ -309,7 +309,7 @@ The `REDIS.TIMEOUT` configuration allows you to set a timeout for Redis connecti
 The OTP service also provides additional configuration parameters that can be adjusted in the `CONFIG` section of the configuration file.
 
 - **`CONFIG.HASH_KEY`**: If set to `true`, the Redis keys used to store OTPs are hashed using SHA-256. This helps to prevent any potential key collisions and makes the keys more secure. It is recommended to keep this value as `true` for production environments.
-- **`SERVER.DEBUG`**: If set to `true`, the service will log additional debug information, which can be helpful for troubleshooting. It is recommended to keep this value as `false` for production environments.
+- **`SERVER.MODE`**: Server mode can be set to `release` for production or `test` for development/testing. Test mode provides additional debugging information and exposes the OTP value in responses.
 
 ## Technical Architecture
 
