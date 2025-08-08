@@ -58,6 +58,14 @@ func LoadConfig() (*Config, error) {
 	viper.BindEnv("server.host", "SERVER_HOST")
 	viper.BindEnv("server.port", "SERVER_PORT")
 	viper.BindEnv("server.mode", "SERVER_MODE")
+	viper.BindEnv("server.timeout.read", "SERVER_TIMEOUT_READ")
+	viper.BindEnv("server.timeout.write", "SERVER_TIMEOUT_WRITE")
+	viper.BindEnv("server.timeout.idle", "SERVER_TIMEOUT_IDLE")
+	viper.BindEnv("server.timeout.read_header", "SERVER_TIMEOUT_READ_HEADER")
+	viper.BindEnv("server.tls.enabled", "TLS_ENABLED")
+	viper.BindEnv("server.tls.cert_file", "TLS_CERT_FILE")
+	viper.BindEnv("server.tls.key_file", "TLS_KEY_FILE")
+	viper.BindEnv("server.tls.client_certs", "TLS_CLIENT_CERTS")
 	viper.BindEnv("config.hash_keys", "HASH_KEYS")
 
 	var config Config
