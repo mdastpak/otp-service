@@ -10,7 +10,7 @@ This README provides details on the API endpoints, input parameters, expected re
   - [Verify OTP](#verify-otp)
   - [Health Check](#health-check)
 - [Postman Collection](#postman-collection)
-- [Request Parameters](#request-parameters)
+- [Request Parameter Options](#request-parameter-options)
 - [Response Structure](#response-structure)
 - [Status Code Guide](#status-code-guide)
 - [Additional Notes](#additional-notes)
@@ -151,7 +151,7 @@ curl -X GET "http://localhost:8080/health"
 
 You can find the Postman collection for this service [here](https://web.postman.co/workspace/be07ea85-299a-4d7f-a2c9-61cd33071f4b/collection/11658275-de41dacd-ab9b-4600-969d-2b62d60300c6).
 
-## Request Parameters
+## Request Parameter Options
 
 The OTP service supports passing parameters via either the query string or request body (in JSON format). The following parameters can be used:
 
@@ -304,7 +304,7 @@ The `REDIS.KEY_PREFIX` configuration allows you to set a prefix for all Redis ke
 
 The `REDIS.TIMEOUT` configuration allows you to set a timeout for Redis connections. This is useful for ensuring that the service does not get stuck waiting for a Redis connection that is not responding. The default value is `5s`.
 
-### Additional Configuration Parameters
+### Configuration Parameters
 
 The OTP service also provides additional configuration parameters that can be adjusted in the `CONFIG` section of the configuration file.
 
@@ -318,29 +318,34 @@ The OTP service also provides additional configuration parameters that can be ad
 The OTP service has undergone significant architectural improvements to enhance performance, scalability, and maintainability:
 
 #### 🔄 **Library Upgrades**
+
 - **Redis Client**: Migrated from `github.com/go-redis/redis/v8` to `github.com/redis/go-redis/v9`
   - Official Redis organization library with active maintenance
   - Better connection pooling with `ConnMaxIdleTime` configuration
   - Enhanced Redis 7+ feature support
 
 #### ⚡ **Performance Optimizations**
+
 - **Sharding Algorithm**: Replaced SHA-256 with UUID-based direct parsing
   - **10x performance improvement** in shard index calculation
   - **Better distribution** using 4 bytes vs 1 byte entropy
   - **Configuration caching** eliminates repeated parsing overhead
 
 #### 🛠️ **Code Quality Enhancements**
+
 - **Error Handling**: Comprehensive fallback strategies for malformed UUIDs
 - **Consistency**: Deterministic shard mapping for same UUID across calls
 - **Testing**: Updated test suites with proper initialization patterns
 - **Documentation**: Enhanced code comments and technical explanations
 
 #### 📈 **Scalability Features**
+
 - **Range Support**: Proper handling of Redis index ranges with start+offset
 - **Load Distribution**: Even distribution across all configured Redis databases
 - **Resource Optimization**: Reduced CPU usage for high-throughput scenarios
 
 #### 🔒 **Security Enhancements**
+
 - **Dependency Updates**: Updated to latest secure versions of golang.org/x/net and golang.org/x/crypto
 - **Vulnerability Fixes**: Addressed IPv6 Zone ID HTTP Proxy Bypass, XSS, DoS, and authorization bypass vulnerabilities
 - **Security Patches**: Proactive security monitoring and rapid vulnerability remediation
@@ -357,21 +362,25 @@ The OTP service follows a strategic 5-phase development roadmap designed to evol
 - Performance-optimized UUID-based sharding
 
 ### **Phase 2: Enhanced Observability & Security** 🔄 **IN PROGRESS**
+
 - OpenTelemetry tracing and Prometheus metrics
 - Advanced security features and audit logging
 - Enhanced monitoring and health checks
 
-### **Phase 3: Scalability & Multi-Region** 📈 **PLANNED** 
+### **Phase 3: Scalability & Multi-Region** 📈 **PLANNED**
+
 - Redis Cluster support for horizontal scaling
 - Multi-region deployment capabilities
 - High availability and resilience patterns
 
 ### **Phase 4: Enterprise Features** 🚀 **FUTURE**
+
 - Multi-tenant architecture and compliance
 - Advanced API capabilities (GraphQL, gRPC)
 - Admin dashboard and white-label solutions
 
 ### **Phase 5: AI/ML Integration** 🤖 **VISIONARY**
+
 - Intelligent fraud detection and optimization
 - Predictive analytics and scaling
 - Next-generation protocol support
