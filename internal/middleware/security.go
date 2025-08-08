@@ -97,3 +97,61 @@ func HealthCheck(redisClient redis.RedisInterface) gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+// CORS adds CORS headers to prevent CSRF attacks
+func CORS(cfg *config.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		origin := c.Request.Header.Get("Origin")
+		
+		// In production, define specific allowed origins
+		// For development/test, allow localhost
+		allowedOrigins := []string{
+			"http://localhost:3000",
+			"http://localhost:8080",
+			"https://localhost:3000",
+			"https://localhost:8080",
+		}
+		
+		// Only allow specific origins
+		allowed := false
+		for _, allowedOrigin := range allowedOrigins {
+			if origin == allowedOrigin {
+				allowed = true
+				break
+			}
+		}
+		
+		if allowed {
+			c.Header("Access-Control-Allow-Origin", origin)
+		}
+		
+		// Define allowed methods
+		c.Header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		
+		// Define allowed headers
+		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+		
+		// Define allowed credentials
+		c.Header("Access-Control-Allow-Credentials", "true")
+		
+		// Max age for preflight
+		c.Header("Access-Control-Max-Age", "86400")
+		
+		// Handle preflight requests
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+		
+		c.Next()
+	}
+}
+
+// RequestSizeLimit limits request body size to prevent resource exhaustion
+func RequestSizeLimit() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Limit request body size to 1MB to prevent resource exhaustion
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 1024*1024)
+		c.Next()
+	}
+}

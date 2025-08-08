@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/json"
 	"math/big"
 	"net/http"
@@ -236,8 +237,13 @@ func (h *OTPHandler) VerifyOTP(c *gin.Context) {
 		return
 	}
 
-	// Check OTP case-insensitively if alphanumeric
-	if !strings.EqualFold(otpData.OTP, userInputOTP) {
+	// Check OTP using constant-time comparison to prevent timing attacks
+	// For case-insensitive comparison, normalize both strings first
+	storedOTP := strings.ToUpper(otpData.OTP)
+	inputOTP := strings.ToUpper(userInputOTP)
+
+	// Use constant-time comparison
+	if subtle.ConstantTimeCompare([]byte(storedOTP), []byte(inputOTP)) != 1 {
 		h.metrics.IncrementOTPInvalid()
 		if err := h.redisClient.UpdateRetryLimit(requestUUID, otpData); err != nil {
 			h.sendAPIResponse(c, http.StatusInternalServerError, models.StatusOTPInvalid, nil)
@@ -315,9 +321,8 @@ func (h *OTPHandler) Health(c *gin.Context) {
 		"config":       "***********",
 		"server_mode":  h.config.Server.Mode,
 	}
-	if h.config.Server.Mode == "debug" {
-		responseData["config"] = h.config
-	} else if h.config.Server.Mode == "test" {
+	// Only show minimal config in test mode, never expose full config or sensitive details
+	if h.config.Server.Mode == "test" {
 		responseData["test_mode"] = true
 		responseData["debug_features"] = map[string]interface{}{
 			"otp_visible_in_generation": true,
