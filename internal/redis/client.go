@@ -58,7 +58,10 @@ func NewClient(cfg *config.Config, logger *logrus.Logger) (*Client, error) {
 	logger.Info("Connected to Redis successfully")
 
 	// Initialize shard configuration
-	shardConfig := initShardConfig(cfg)
+	shardConfig, err := initShardConfig(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize shard configuration: %v", err)
+	}
 
 	return &Client{
 		client:      client,
@@ -83,35 +86,35 @@ func (c *Client) Ping() error {
 }
 
 // initShardConfig parses and caches shard configuration for performance
-func initShardConfig(cfg *config.Config) *ShardConfig {
+func initShardConfig(cfg *config.Config) (*ShardConfig, error) {
 	rangeParts := strings.Split(cfg.Redis.Indices, "-")
 
 	if cfg.Redis.Indices == "0" {
-		return &ShardConfig{shardCount: 1, startIndex: 0, isRange: false}
+		return &ShardConfig{shardCount: 1, startIndex: 0, isRange: false}, nil
 	}
 
 	if len(rangeParts) == 1 {
 		count, err := strconv.Atoi(rangeParts[0])
 		if err != nil || count <= 0 {
-			panic(fmt.Sprintf("Invalid Redis Indices configuration: %v", err))
+			return nil, fmt.Errorf("invalid Redis Indices configuration: %v", err)
 		}
-		return &ShardConfig{shardCount: count, startIndex: 0, isRange: false}
+		return &ShardConfig{shardCount: count, startIndex: 0, isRange: false}, nil
 	} else if len(rangeParts) == 2 {
 		start, err := strconv.Atoi(rangeParts[0])
 		if err != nil {
-			panic(fmt.Sprintf("Invalid Redis Indices start configuration: %v", err))
+			return nil, fmt.Errorf("invalid Redis Indices start configuration: %v", err)
 		}
 		end, err := strconv.Atoi(rangeParts[1])
 		if err != nil {
-			panic(fmt.Sprintf("Invalid Redis Indices end configuration: %v", err))
+			return nil, fmt.Errorf("invalid Redis Indices end configuration: %v", err)
 		}
 		count := end - start + 1
 		if count <= 0 {
-			panic("Invalid Redis Indices configuration: range results in zero or negative count")
+			return nil, fmt.Errorf("invalid Redis Indices configuration: range results in zero or negative count")
 		}
-		return &ShardConfig{shardCount: count, startIndex: start, isRange: true}
+		return &ShardConfig{shardCount: count, startIndex: start, isRange: true}, nil
 	} else {
-		panic("Invalid Redis Indices format. Use a single number or a range (e.g., '0-2')")
+		return nil, fmt.Errorf("invalid Redis Indices format. Use a single number or a range (e.g., '0-2')")
 	}
 }
 
