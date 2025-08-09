@@ -338,6 +338,47 @@ func TestMissingVerificationParameters(t *testing.T) {
 	}
 }
 
+// TestTestModeDetailedInfo tests test mode shows detailed information
+func TestTestModeDetailedInfo(t *testing.T) {
+	router, _, redisClient := setupTestEnvironment(t, "test")
+	if router == nil {
+		return
+	}
+	defer redisClient.Close()
+	
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/health", nil)
+	
+	router.ServeHTTP(w, req)
+	
+	assert.Equal(t, http.StatusOK, w.Code)
+	
+	var response models.APIResponse
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Equal(t, models.StatusServiceHealth, response.Message)
+	
+	// Check that test mode shows detailed info
+	info, ok := response.Info.(map[string]interface{})
+	assert.True(t, ok)
+	assert.Equal(t, "test", info["server_mode"])
+	assert.True(t, info["test_mode"].(bool))
+	
+	// Check debug features are present
+	debugFeatures, exists := info["debug_features"]
+	assert.True(t, exists)
+	features := debugFeatures.(map[string]interface{})
+	assert.True(t, features["detailed_debug_info"].(bool))
+	
+	// Check config summary is present
+	_, configExists := info["config_summary"]
+	assert.True(t, configExists)
+	
+	// Check environment info is present
+	_, envExists := info["environment_info"]
+	assert.True(t, envExists)
+}
+
 // TestProductionModeHeaders tests production security headers
 func TestProductionModeHeaders(t *testing.T) {
 	router, _, redisClient := setupTestEnvironment(t, "release")
@@ -355,6 +396,27 @@ func TestProductionModeHeaders(t *testing.T) {
 	assert.NotEmpty(t, w.Header().Get("Strict-Transport-Security"))
 	assert.Equal(t, "DENY", w.Header().Get("X-Frame-Options"))
 	assert.Equal(t, "nosniff", w.Header().Get("X-Content-Type-Options"))
+	
+	// Check that production mode shows minimal info
+	var response models.APIResponse
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	
+	info, ok := response.Info.(map[string]interface{})
+	assert.True(t, ok)
+	assert.Equal(t, "release", info["server_mode"])
+	
+	// Production mode should NOT have debug features
+	_, hasDebugFeatures := info["debug_features"]
+	assert.False(t, hasDebugFeatures)
+	
+	// Production mode should NOT have config summary
+	_, hasConfigSummary := info["config_summary"]
+	assert.False(t, hasConfigSummary)
+	
+	// Production mode should NOT have environment info
+	_, hasEnvInfo := info["environment_info"]
+	assert.False(t, hasEnvInfo)
 }
 
 // TestSecurityInputs tests basic security input validation

@@ -321,7 +321,7 @@ func (h *OTPHandler) Health(c *gin.Context) {
 		"config":       "***********",
 		"server_mode":  h.config.Server.Mode,
 	}
-	// Only show minimal config in test mode, never expose full config or sensitive details
+	// Show detailed info in test mode, minimal info in production/release modes
 	if h.config.Server.Mode == "test" {
 		responseData["test_mode"] = true
 		responseData["debug_features"] = map[string]interface{}{
@@ -329,13 +329,20 @@ func (h *OTPHandler) Health(c *gin.Context) {
 			"detailed_debug_info":       true,
 			"request_tracking":          true,
 		}
-		// Show some config details but not sensitive ones
+		// Show config details but not sensitive ones
 		responseData["config_summary"] = map[string]interface{}{
 			"redis_host":  h.config.Redis.Host,
 			"redis_port":  h.config.Redis.Port,
 			"server_host": h.config.Server.Host,
 			"server_port": h.config.Server.Port,
 			"hash_keys":   h.config.Config.HashKeys,
+		}
+		// Add additional debug information
+		responseData["environment_info"] = map[string]interface{}{
+			"server_mode":    h.config.Server.Mode,
+			"cors_enabled":   true,
+			"verbose_logs":   true,
+			"health_checks":  "detailed",
 		}
 	}
 
