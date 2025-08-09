@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -121,17 +120,14 @@ func CORS(cfg *config.Config) gin.HandlerFunc {
 			allowedOrigins[i] = strings.TrimSpace(o)
 		}
 		
-		// Check if origin is allowed
-		allowed := false
+		// Check if origin is allowed and set appropriate header
 		if cfg.CORS.AllowedOrigins == "*" {
 			// Allow all origins
-			allowed = true
 			c.Header("Access-Control-Allow-Origin", "*")
 		} else {
 			// Check specific origins
 			for _, allowedOrigin := range allowedOrigins {
 				if origin == allowedOrigin {
-					allowed = true
 					c.Header("Access-Control-Allow-Origin", origin)
 					break
 				}
