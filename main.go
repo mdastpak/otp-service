@@ -272,16 +272,6 @@ func init() {
 	})
 	logger.SetLevel(logrus.InfoLevel)
 
-	// Print startup banner
-	fmt.Println("\n" + strings.Repeat("=", 80))
-	fmt.Println("🚀  OTP SERVICE  🚀")
-	fmt.Println(strings.Repeat("=", 80))
-	fmt.Printf("   Version: 1.0.0\n")
-	fmt.Printf("   PID: %d\n", os.Getpid())
-	fmt.Printf("   Started: %s\n", time.Now().Format("2006-01-02 15:04:05 UTC"))
-	fmt.Printf("   Mode: %s\n", os.Getenv("ENVIRONMENT"))
-	fmt.Println(strings.Repeat("=", 80) + "\n")
-
 	// Log service startup
 	logger.WithFields(logrus.Fields{
 		"service": "otp-service",
@@ -1177,6 +1167,43 @@ func main() {
 		"server_mode": cfg.Server.Mode,
 		"startup_complete": true,
 	}).Info("✅ OTP Service startup completed - server ready to accept connections")
+	
+	// Beautiful startup summary
+	protocol := "http"
+	if cfg.Server.TLS.Enabled {
+		protocol = "https"
+	}
+	serverURL := fmt.Sprintf("%s://%s", protocol, server.Addr)
+	
+	logger.Info("==========================================")
+	logger.Info("🔐 OTP Service - Production Ready")  
+	logger.Info("==========================================")
+	logger.WithField("url", serverURL).Info("📡 Server URL: " + serverURL)
+	logger.Info("")
+	
+	logger.Info("📋 Available Endpoints:")
+	logger.Info("   ├─ POST " + serverURL + "/          - Generate OTP")
+	logger.Info("   ├─ GET  " + serverURL + "/?uuid=...  - Verify OTP") 
+	logger.Info("   ├─ GET  " + serverURL + "/health     - Health Check")
+	logger.Info("   └─ GET  " + serverURL + "/metrics    - System Metrics")
+	logger.Info("")
+	
+	logger.Info("⚙️  Configuration:")
+	logger.WithField("mode", cfg.Server.Mode).Info("   ├─ Server Mode: " + cfg.Server.Mode)
+	logger.WithField("redis", fmt.Sprintf("%s:%s", cfg.Redis.Host, cfg.Redis.Port)).Info("   ├─ Redis: " + fmt.Sprintf("%s:%s", cfg.Redis.Host, cfg.Redis.Port))
+	logger.WithField("indices", cfg.Redis.Indices).Info("   ├─ Redis Sharding: " + cfg.Redis.Indices)
+	logger.WithField("hash_keys", cfg.Config.HashKeys).Info(fmt.Sprintf("   ├─ Key Hashing: %t", cfg.Config.HashKeys))
+	
+	tlsStatus := "❌ Disabled"
+	if cfg.Server.TLS.Enabled {
+		tlsStatus = "✅ Enabled"
+	}
+	logger.WithField("tls_enabled", cfg.Server.TLS.Enabled).Info("   ├─ TLS/SSL: " + tlsStatus)
+	logger.Info("   └─ Security Headers: ✅ Enabled")
+	logger.Info("")
+	
+	logger.Info("🚀 Server Starting...")
+	logger.Info("==========================================")
 	
 	if cfg.Server.TLS.Enabled {
 		logger.WithField("protocol", "HTTPS").Info("Starting HTTPS server...")
