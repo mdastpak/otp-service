@@ -9,12 +9,13 @@ WORKDIR /app
 # Copy go mod files
 COPY go.mod go.sum ./
 
-# Configure Go proxy
-ENV GOPROXY=https://proxy.golang.org,direct
-ENV GOSUMDB=sum.golang.org
+# Configure Go proxy with multiple fallbacks
+ENV GOPROXY=https://goproxy.cn,https://goproxy.io,https://proxy.golang.org,direct
+ENV GOSUMDB=off
+ENV GOPRIVATE=""
 
-# Download dependencies
-RUN go mod download
+# Download dependencies with retry logic
+RUN go mod download || (sleep 5 && go mod download) || go mod download -x
 
 # Copy source code
 COPY . .
@@ -32,8 +33,9 @@ RUN apk add --no-cache ca-certificates curl tzdata && \
 # Create appuser
 RUN adduser -D -g '' appuser
 
-# Copy binary
+# Copy binary and config
 COPY --from=builder /app/otp-service /otp-service
+COPY --from=builder /app/config.yaml /config.yaml
 
 # Create directories
 RUN mkdir -p /app/logs && chown -R appuser:appuser /app
