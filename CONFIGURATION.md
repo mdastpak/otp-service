@@ -4,32 +4,27 @@ The OTP service uses a **unified configuration approach** with environment varia
 
 ## Configuration Hierarchy
 
-1. **`.env`** - Local development defaults
-2. **`.env.docker`** - Docker-specific overrides  
+1. **`.env.test`** - Default test/development mode (default)
+2. **`.env.production`** - Production environment configuration
 3. **`config.yaml`** - Fallback defaults and documentation
 4. **Environment variables** - Ultimate override
 
 ## Files Overview
 
-### 📄 `.env`
+### 📄 `.env.test`
 
-Default configuration for local development
+Default configuration for test/development mode. This is the **default** environment file used by:
+- Local development
+- Docker Compose (test mode)
+- CI/CD testing
+- Development debugging
 
-```bash
-cp .env.example .env
-# Edit .env with your local settings
-```
+### 📄 `.env.production`
 
-### 📄 `.env.docker`
-
-Docker-specific configuration (used by docker-compose)
-
-- Automatically sets `REDIS_HOST=redis`
-- Sets `SERVER_HOST=0.0.0.0` for container networking
-
-### 📄 `.env.example`
-
-Template file showing all available configuration options
+Production environment configuration used for:
+- Production deployments
+- Docker Compose production mode (`docker-compose -f docker-compose.yml -f docker-compose.production.yml up`)
+- High-performance production settings
 
 ### 📄 `config.yaml`
 
@@ -42,21 +37,21 @@ Template file showing all available configuration options
 ### Local Development
 
 ```bash
-# Copy template
-cp .env.example .env
-
-# Edit your settings
-nano .env
-
-# Run application
+# Run with test configuration (default)
 go run main.go
+
+# Or with custom environment variables
+OTP_LENGTH=8 OTP_EXPIRY=120s go run main.go
 ```
 
 ### Docker Development  
 
 ```bash
-# Uses .env.docker automatically
+# Uses .env.test by default
 docker-compose up
+
+# For production mode
+docker-compose -f docker-compose.yml -f docker-compose.production.yml up
 
 # With monitoring
 docker-compose --profile monitoring up
@@ -88,6 +83,22 @@ Set environment variables directly or use your deployment platform's configurati
 | `TLS_KEY_FILE` | TLS private key file | `key.pem` |
 | `TLS_CLIENT_CERTS` | TLS client certificates | `client_certs.pem` |
 | `HASH_KEYS` | Enable Redis key hashing | `true` |
+| **OTP Configuration** | | |
+| `OTP_LENGTH` | OTP code length | `6` |
+| `OTP_EXPIRY` | OTP expiration time | `60s` |
+| `OTP_MAX_ATTEMPTS` | Maximum verification attempts | `10` |
+| `OTP_CLEANUP_INTERVAL` | Cleanup worker interval | `30s` |
+| **CORS Configuration** | | |
+| `CORS_ALLOWED_ORIGINS` | Allowed origins (* or comma-separated) | `*` |
+| `CORS_ALLOWED_METHODS` | Allowed HTTP methods | `GET,POST,OPTIONS` |
+| `CORS_ALLOWED_HEADERS` | Allowed headers | `Content-Type,Authorization` |
+| `CORS_EXPOSED_HEADERS` | Exposed headers | `Content-Length` |
+| `CORS_MAX_AGE` | Preflight cache duration (seconds) | `3600` |
+| `CORS_ALLOW_CREDENTIALS` | Allow credentials | `true` |
+| **Security Configuration** | | |
+| `SECURITY_HEADERS_ENABLED` | Enable security headers | `false` |
+| `HSTS_MAX_AGE` | HSTS max age (seconds, 0=disabled) | `0` |
+| `CSP_POLICY` | Content Security Policy | `` |
 
 ## Migration from Old Setup
 

@@ -72,6 +72,25 @@ type Config struct {
 	Config struct {
 		HashKeys bool `mapstructure:"hash_keys"`
 	} `mapstructure:"config"`
+	OTP struct {
+		Length          int    `mapstructure:"length"`
+		Expiry          string `mapstructure:"expiry"`
+		MaxAttempts     int    `mapstructure:"max_attempts"`
+		CleanupInterval string `mapstructure:"cleanup_interval"`
+	} `mapstructure:"otp"`
+	CORS struct {
+		AllowedOrigins   string `mapstructure:"allowed_origins"`
+		AllowedMethods   string `mapstructure:"allowed_methods"`
+		AllowedHeaders   string `mapstructure:"allowed_headers"`
+		ExposedHeaders   string `mapstructure:"exposed_headers"`
+		MaxAge           string `mapstructure:"max_age"`
+		AllowCredentials string `mapstructure:"allow_credentials"`
+	} `mapstructure:"cors"`
+	Security struct {
+		HeadersEnabled bool   `mapstructure:"headers_enabled"`
+		HSTSMaxAge     string `mapstructure:"hsts_max_age"`
+		CSPPolicy      string `mapstructure:"csp_policy"`
+	} `mapstructure:"security"`
 }
 
 const (
@@ -124,6 +143,19 @@ func loadConfig() {
 	viper.BindEnv("server.port", "SERVER_PORT")
 	viper.BindEnv("server.mode", "SERVER_MODE")
 	viper.BindEnv("cfg.hash_keys", "HASH_KEYS")
+	viper.BindEnv("otp.length", "OTP_LENGTH")
+	viper.BindEnv("otp.expiry", "OTP_EXPIRY")
+	viper.BindEnv("otp.max_attempts", "OTP_MAX_ATTEMPTS")
+	viper.BindEnv("otp.cleanup_interval", "OTP_CLEANUP_INTERVAL")
+	viper.BindEnv("cors.allowed_origins", "CORS_ALLOWED_ORIGINS")
+	viper.BindEnv("cors.allowed_methods", "CORS_ALLOWED_METHODS")
+	viper.BindEnv("cors.allowed_headers", "CORS_ALLOWED_HEADERS")
+	viper.BindEnv("cors.exposed_headers", "CORS_EXPOSED_HEADERS")
+	viper.BindEnv("cors.max_age", "CORS_MAX_AGE")
+	viper.BindEnv("cors.allow_credentials", "CORS_ALLOW_CREDENTIALS")
+	viper.BindEnv("security.headers_enabled", "SECURITY_HEADERS_ENABLED")
+	viper.BindEnv("security.hsts_max_age", "HSTS_MAX_AGE")
+	viper.BindEnv("security.csp_policy", "CSP_POLICY")
 
 	// Unmarshal configuration into Config struct
 	if err := viper.Unmarshal(&cfg); err != nil {
@@ -287,6 +319,9 @@ func init() {
 	// Initialize Redis client
 	initRedis()
 
+	// Start background cleanup worker
+	startCleanupWorker()
+
 	// Set final log level based on server mode
 	logger.SetLevel(logrus.InfoLevel)
 	if cfg.Server.Mode != "release" {
@@ -321,6 +356,48 @@ func validateOTP(otp string) bool {
 // sanitizeInput removes potentially dangerous characters
 func sanitizeInput(input string) string {
 	return strings.TrimSpace(input)
+}
+
+// getExpirySeconds converts expiry string to seconds for default values
+func getExpirySeconds() int {
+	duration, err := time.ParseDuration(cfg.OTP.Expiry)
+	if err != nil {
+		return 60 // fallback default
+	}
+	return int(duration.Seconds())
+}
+
+// startCleanupWorker starts a background goroutine to clean expired OTPs
+func startCleanupWorker() {
+	interval, err := time.ParseDuration(cfg.OTP.CleanupInterval)
+	if err != nil {
+		logger.WithError(err).Warn("Invalid cleanup interval, using default 30s")
+		interval = 30 * time.Second
+	}
+
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		logger.WithField("interval", interval.String()).Info("🧹 OTP cleanup worker started")
+
+		for {
+			select {
+			case <-ticker.C:
+				cleanupExpiredOTPs()
+			case <-ctx.Done():
+				logger.Info("🧹 OTP cleanup worker stopped")
+				return
+			}
+		}
+	}()
+}
+
+// cleanupExpiredOTPs removes expired OTPs from Redis
+func cleanupExpiredOTPs() {
+	// Redis automatically handles expiration, but we can scan for keys and log cleanup stats
+	// This is optional since Redis TTL handles expiration automatically
+	logger.Debug("🧹 Cleanup cycle completed (Redis handles TTL expiration automatically)")
 }
 
 // APIResponse defines the standard structure for all API responses
@@ -680,8 +757,9 @@ func generateOTPHandler(c *gin.Context) {
 	}
 	otpRequest.UserData = json.RawMessage(rawData)
 
-	// Validate and set parameters
-	ttl, err := strconv.Atoi(c.DefaultQuery("ttl", "60"))
+	// Validate and set parameters using config defaults
+	defaultTTL := strconv.Itoa(getExpirySeconds())
+	ttl, err := strconv.Atoi(c.DefaultQuery("ttl", defaultTTL))
 	if err != nil || ttl < 1 || ttl > 3600 {
 		sendAPIResponse(c, http.StatusBadRequest, StatusTTLInvalid, nil)
 		return
@@ -689,14 +767,16 @@ func generateOTPHandler(c *gin.Context) {
 	otpRequest.TTL = ttl
 	otpRequest.TTLDuration = time.Duration(ttl) * time.Second
 
-	retryLimit, err := strconv.Atoi(c.DefaultQuery("retry_limit", "5"))
+	defaultRetryLimit := strconv.Itoa(cfg.OTP.MaxAttempts)
+	retryLimit, err := strconv.Atoi(c.DefaultQuery("retry_limit", defaultRetryLimit))
 	if err != nil || retryLimit < 1 || retryLimit > 60 {
 		sendAPIResponse(c, http.StatusBadRequest, StatusRetryInvalid, nil)
 		return
 	}
 	otpRequest.RetryLimit = retryLimit
 
-	codeLength, err := strconv.Atoi(c.DefaultQuery("code_length", "6"))
+	defaultCodeLength := strconv.Itoa(cfg.OTP.Length)
+	codeLength, err := strconv.Atoi(c.DefaultQuery("code_length", defaultCodeLength))
 	if err != nil || codeLength < 1 || codeLength > 10 {
 		sendAPIResponse(c, http.StatusBadRequest, StatusCodeInvalid, nil)
 		return
@@ -1199,7 +1279,19 @@ func main() {
 		tlsStatus = "✅ Enabled"
 	}
 	logger.WithField("tls_enabled", cfg.Server.TLS.Enabled).Info("   ├─ TLS/SSL: " + tlsStatus)
-	logger.Info("   └─ Security Headers: ✅ Enabled")
+	logger.WithField("otp_config", fmt.Sprintf("Length:%d, Expiry:%s, MaxAttempts:%d, Cleanup:%s", cfg.OTP.Length, cfg.OTP.Expiry, cfg.OTP.MaxAttempts, cfg.OTP.CleanupInterval)).Info("   ├─ OTP Config: " + fmt.Sprintf("Length:%d, Expiry:%s, MaxAttempts:%d, Cleanup:%s", cfg.OTP.Length, cfg.OTP.Expiry, cfg.OTP.MaxAttempts, cfg.OTP.CleanupInterval))
+	
+	corsStatus := cfg.CORS.AllowedOrigins
+	if len(corsStatus) > 50 {
+		corsStatus = corsStatus[:47] + "..."
+	}
+	logger.WithField("cors_config", corsStatus).Info("   ├─ CORS Origins: " + corsStatus)
+	
+	securityStatus := "❌ Disabled"
+	if cfg.Security.HeadersEnabled {
+		securityStatus = "✅ Enabled"
+	}
+	logger.WithField("security_headers", cfg.Security.HeadersEnabled).Info("   └─ Security Headers: " + securityStatus)
 	logger.Info("")
 	
 	logger.Info("🚀 Server Starting...")
@@ -1242,39 +1334,40 @@ func corsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
 		
-		// In production, define specific allowed origins
-		// For development/test, allow localhost
-		allowedOrigins := []string{
-			"http://localhost:3000",
-			"http://localhost:8080",
-			"https://localhost:3000",
-			"https://localhost:8080",
+		// Parse allowed origins from configuration
+		allowedOrigins := strings.Split(cfg.CORS.AllowedOrigins, ",")
+		for i, o := range allowedOrigins {
+			allowedOrigins[i] = strings.TrimSpace(o)
 		}
 		
-		// Only allow specific origins
-		allowed := false
-		for _, allowedOrigin := range allowedOrigins {
-			if origin == allowedOrigin {
-				allowed = true
-				break
+		// Check if origin is allowed and set appropriate header
+		if cfg.CORS.AllowedOrigins == "*" {
+			// Allow all origins
+			c.Header("Access-Control-Allow-Origin", "*")
+		} else {
+			// Check specific origins
+			for _, allowedOrigin := range allowedOrigins {
+				if origin == allowedOrigin {
+					c.Header("Access-Control-Allow-Origin", origin)
+					break
+				}
 			}
 		}
 		
-		if allowed {
-			c.Header("Access-Control-Allow-Origin", origin)
+		// Set CORS headers using configuration
+		c.Header("Access-Control-Allow-Methods", cfg.CORS.AllowedMethods)
+		c.Header("Access-Control-Allow-Headers", cfg.CORS.AllowedHeaders)
+		
+		// Set exposed headers if configured
+		if cfg.CORS.ExposedHeaders != "" {
+			c.Header("Access-Control-Expose-Headers", cfg.CORS.ExposedHeaders)
 		}
 		
-		// Define allowed methods
-		c.Header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		// Set credentials policy
+		c.Header("Access-Control-Allow-Credentials", cfg.CORS.AllowCredentials)
 		
-		// Define allowed headers
-		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
-		
-		// Define allowed credentials
-		c.Header("Access-Control-Allow-Credentials", "true")
-		
-		// Max age for preflight
-		c.Header("Access-Control-Max-Age", "86400")
+		// Set max age for preflight
+		c.Header("Access-Control-Max-Age", cfg.CORS.MaxAge)
 		
 		// Handle preflight requests
 		if c.Request.Method == "OPTIONS" {
@@ -1289,6 +1382,12 @@ func corsMiddleware() gin.HandlerFunc {
 // securityHeadersMiddleware adds security headers to the response
 func securityHeadersMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Only add security headers if enabled
+		if !cfg.Security.HeadersEnabled {
+			c.Next()
+			return
+		}
+
 		// Clickjacking Protection
 		c.Header("X-Frame-Options", "DENY")
 
@@ -1298,30 +1397,33 @@ func securityHeadersMiddleware() gin.HandlerFunc {
 		// XSS Protection in browsers
 		c.Header("X-XSS-Protection", "1; mode=block")
 
-		//
 		c.Header("X-Permitted-Cross-Domain-Policies", "none")
 
 		// Content Security Policy Configuration
-		csp := []string{
-			"default-src 'self'",
-			"script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-			"style-src 'self' 'unsafe-inline'",
-			"img-src 'self' data:",
-			"font-src 'self'",
-			"form-action 'self'",
-			"frame-ancestors 'none'",
-			"base-uri 'self'",
-			"block-all-mixed-content",
+		if cfg.Security.CSPPolicy != "" {
+			c.Header("Content-Security-Policy", cfg.Security.CSPPolicy)
+		} else {
+			// Default CSP policy
+			csp := []string{
+				"default-src 'self'",
+				"script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+				"style-src 'self' 'unsafe-inline'",
+				"img-src 'self' data:",
+				"font-src 'self'",
+				"form-action 'self'",
+				"frame-ancestors 'none'",
+				"base-uri 'self'",
+				"block-all-mixed-content",
+			}
+			c.Header("Content-Security-Policy", strings.Join(csp, "; "))
 		}
-		c.Header("Content-Security-Policy", strings.Join(csp, "; "))
 
 		// Add Referrer Policy
 		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
 
-		// تنظیم HSTS - فقط در محیط production با SSL
-		// HSTS Configuration - Only in production environment with SSL
-		if cfg.Server.TLS.Enabled {
-			c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
+		// HSTS Configuration - Use configured max age
+		if cfg.Server.TLS.Enabled && cfg.Security.HSTSMaxAge != "0" {
+			c.Header("Strict-Transport-Security", "max-age="+cfg.Security.HSTSMaxAge+"; includeSubDomains; preload")
 		}
 		c.Header("X-Download-Options", "noopen")
 		c.Header("X-DNS-Prefetch-Control", "off")

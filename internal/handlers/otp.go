@@ -58,6 +58,15 @@ func sanitizeInput(input string) string {
 	return strings.TrimSpace(input)
 }
 
+// getExpirySeconds converts expiry string to seconds for default values
+func (h *OTPHandler) getExpirySeconds() int {
+	duration, err := time.ParseDuration(h.config.OTP.Expiry)
+	if err != nil {
+		return 60 // fallback default
+	}
+	return int(duration.Seconds())
+}
+
 // sendAPIResponse sends a standardized JSON API response
 func (h *OTPHandler) sendAPIResponse(c *gin.Context, status int, message string, info interface{}) {
 	c.JSON(status, models.APIResponse{
@@ -115,8 +124,9 @@ func (h *OTPHandler) GenerateOTP(c *gin.Context) {
 	}
 	otpRequest.UserData = json.RawMessage(rawData)
 
-	// Validate and set parameters
-	ttl, err := strconv.Atoi(c.DefaultQuery("ttl", "60"))
+	// Validate and set parameters using config defaults
+	defaultTTL := strconv.Itoa(h.getExpirySeconds())
+	ttl, err := strconv.Atoi(c.DefaultQuery("ttl", defaultTTL))
 	if err != nil || ttl < 1 || ttl > 3600 {
 		h.sendAPIResponse(c, http.StatusBadRequest, models.StatusTTLInvalid, nil)
 		return
@@ -124,14 +134,16 @@ func (h *OTPHandler) GenerateOTP(c *gin.Context) {
 	otpRequest.TTL = ttl
 	otpRequest.TTLDuration = time.Duration(ttl) * time.Second
 
-	retryLimit, err := strconv.Atoi(c.DefaultQuery("retry_limit", "5"))
+	defaultRetryLimit := strconv.Itoa(h.config.OTP.MaxAttempts)
+	retryLimit, err := strconv.Atoi(c.DefaultQuery("retry_limit", defaultRetryLimit))
 	if err != nil || retryLimit < 1 || retryLimit > 60 {
 		h.sendAPIResponse(c, http.StatusBadRequest, models.StatusRetryInvalid, nil)
 		return
 	}
 	otpRequest.RetryLimit = retryLimit
 
-	codeLength, err := strconv.Atoi(c.DefaultQuery("code_length", "6"))
+	defaultCodeLength := strconv.Itoa(h.config.OTP.Length)
+	codeLength, err := strconv.Atoi(c.DefaultQuery("code_length", defaultCodeLength))
 	if err != nil || codeLength < 1 || codeLength > 10 {
 		h.sendAPIResponse(c, http.StatusBadRequest, models.StatusCodeInvalid, nil)
 		return

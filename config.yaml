@@ -27,3 +27,25 @@ server:
 
 config:
   hash_keys: true                    # Hash Redis keys for obfuscation; override with HASH_KEYS
+
+# OTP Configuration defaults
+otp:
+  length: 6                          # Override with OTP_LENGTH
+  expiry: "60s"                      # Override with OTP_EXPIRY
+  max_attempts: 10                   # Override with OTP_MAX_ATTEMPTS  
+  cleanup_interval: "30s"            # Override with OTP_CLEANUP_INTERVAL
+
+# CORS Configuration defaults
+cors:
+  allowed_origins: "*"               # Override with CORS_ALLOWED_ORIGINS
+  allowed_methods: "GET,POST,OPTIONS" # Override with CORS_ALLOWED_METHODS
+  allowed_headers: "Content-Type,Authorization" # Override with CORS_ALLOWED_HEADERS
+  exposed_headers: "Content-Length"  # Override with CORS_EXPOSED_HEADERS
+  max_age: "3600"                   # Override with CORS_MAX_AGE
+  allow_credentials: "true"          # Override with CORS_ALLOW_CREDENTIALS
+
+# Security Configuration defaults
+security:
+  headers_enabled: false             # Override with SECURITY_HEADERS_ENABLED
+  hsts_max_age: "0"                 # Override with HSTS_MAX_AGE
+  csp_policy: ""                    # Override with CSP_POLICY

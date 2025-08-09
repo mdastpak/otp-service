@@ -35,6 +35,25 @@ type Config struct {
 	Config struct {
 		HashKeys bool `mapstructure:"hash_keys"`
 	} `mapstructure:"config"`
+	OTP struct {
+		Length          int    `mapstructure:"length"`
+		Expiry          string `mapstructure:"expiry"`
+		MaxAttempts     int    `mapstructure:"max_attempts"`
+		CleanupInterval string `mapstructure:"cleanup_interval"`
+	} `mapstructure:"otp"`
+	CORS struct {
+		AllowedOrigins   string `mapstructure:"allowed_origins"`
+		AllowedMethods   string `mapstructure:"allowed_methods"`
+		AllowedHeaders   string `mapstructure:"allowed_headers"`
+		ExposedHeaders   string `mapstructure:"exposed_headers"`
+		MaxAge           string `mapstructure:"max_age"`
+		AllowCredentials string `mapstructure:"allow_credentials"`
+	} `mapstructure:"cors"`
+	Security struct {
+		HeadersEnabled bool   `mapstructure:"headers_enabled"`
+		HSTSMaxAge     string `mapstructure:"hsts_max_age"`
+		CSPPolicy      string `mapstructure:"csp_policy"`
+	} `mapstructure:"security"`
 }
 
 // LoadConfig reads the configuration from the config file and environment variables
@@ -67,6 +86,19 @@ func LoadConfig() (*Config, error) {
 	viper.BindEnv("server.tls.key_file", "TLS_KEY_FILE")
 	viper.BindEnv("server.tls.client_certs", "TLS_CLIENT_CERTS")
 	viper.BindEnv("config.hash_keys", "HASH_KEYS")
+	viper.BindEnv("otp.length", "OTP_LENGTH")
+	viper.BindEnv("otp.expiry", "OTP_EXPIRY")
+	viper.BindEnv("otp.max_attempts", "OTP_MAX_ATTEMPTS")
+	viper.BindEnv("otp.cleanup_interval", "OTP_CLEANUP_INTERVAL")
+	viper.BindEnv("cors.allowed_origins", "CORS_ALLOWED_ORIGINS")
+	viper.BindEnv("cors.allowed_methods", "CORS_ALLOWED_METHODS")
+	viper.BindEnv("cors.allowed_headers", "CORS_ALLOWED_HEADERS")
+	viper.BindEnv("cors.exposed_headers", "CORS_EXPOSED_HEADERS")
+	viper.BindEnv("cors.max_age", "CORS_MAX_AGE")
+	viper.BindEnv("cors.allow_credentials", "CORS_ALLOW_CREDENTIALS")
+	viper.BindEnv("security.headers_enabled", "SECURITY_HEADERS_ENABLED")
+	viper.BindEnv("security.hsts_max_age", "HSTS_MAX_AGE")
+	viper.BindEnv("security.csp_policy", "CSP_POLICY")
 
 	var config Config
 	if err := viper.Unmarshal(&config); err != nil {

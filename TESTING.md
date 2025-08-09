@@ -215,7 +215,8 @@ go list ./... | grep -v vendor | wc -l  # Count packages
 - ✅ `Makefile` with test targets (`test`, `test-all`, `coverage`, `benchmark`)
 - ✅ `run_tests.sh` executable test runner script
 - ✅ `config_test.yaml` test-specific configuration
-- ✅ `.env.example` environment template
+- ✅ `.env.test` default test environment
+- ✅ `.env.production` production environment
 
 ## Continuous Integration
 

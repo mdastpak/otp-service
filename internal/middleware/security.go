@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -14,6 +15,12 @@ import (
 // SecurityHeaders adds security headers to the response
 func SecurityHeaders(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Only add security headers if enabled
+		if !cfg.Security.HeadersEnabled {
+			c.Next()
+			return
+		}
+
 		// Clickjacking Protection
 		c.Header("X-Frame-Options", "DENY")
 
@@ -26,25 +33,30 @@ func SecurityHeaders(cfg *config.Config) gin.HandlerFunc {
 		c.Header("X-Permitted-Cross-Domain-Policies", "none")
 
 		// Content Security Policy Configuration
-		csp := []string{
-			"default-src 'self'",
-			"script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-			"style-src 'self' 'unsafe-inline'",
-			"img-src 'self' data:",
-			"font-src 'self'",
-			"form-action 'self'",
-			"frame-ancestors 'none'",
-			"base-uri 'self'",
-			"block-all-mixed-content",
+		if cfg.Security.CSPPolicy != "" {
+			c.Header("Content-Security-Policy", cfg.Security.CSPPolicy)
+		} else {
+			// Default CSP policy
+			csp := []string{
+				"default-src 'self'",
+				"script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+				"style-src 'self' 'unsafe-inline'",
+				"img-src 'self' data:",
+				"font-src 'self'",
+				"form-action 'self'",
+				"frame-ancestors 'none'",
+				"base-uri 'self'",
+				"block-all-mixed-content",
+			}
+			c.Header("Content-Security-Policy", strings.Join(csp, "; "))
 		}
-		c.Header("Content-Security-Policy", strings.Join(csp, "; "))
 
 		// Add Referrer Policy
 		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
 
-		// HSTS Configuration - Only in production environment with SSL
-		if cfg.Server.TLS.Enabled {
-			c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
+		// HSTS Configuration - Use configured max age
+		if cfg.Server.TLS.Enabled && cfg.Security.HSTSMaxAge != "0" {
+			c.Header("Strict-Transport-Security", "max-age="+cfg.Security.HSTSMaxAge+"; includeSubDomains; preload")
 		}
 		c.Header("X-Download-Options", "noopen")
 		c.Header("X-DNS-Prefetch-Control", "off")
@@ -103,39 +115,43 @@ func CORS(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
 		
-		// In production, define specific allowed origins
-		// For development/test, allow localhost
-		allowedOrigins := []string{
-			"http://localhost:3000",
-			"http://localhost:8080",
-			"https://localhost:3000",
-			"https://localhost:8080",
+		// Parse allowed origins from configuration
+		allowedOrigins := strings.Split(cfg.CORS.AllowedOrigins, ",")
+		for i, o := range allowedOrigins {
+			allowedOrigins[i] = strings.TrimSpace(o)
 		}
 		
-		// Only allow specific origins
+		// Check if origin is allowed
 		allowed := false
-		for _, allowedOrigin := range allowedOrigins {
-			if origin == allowedOrigin {
-				allowed = true
-				break
+		if cfg.CORS.AllowedOrigins == "*" {
+			// Allow all origins
+			allowed = true
+			c.Header("Access-Control-Allow-Origin", "*")
+		} else {
+			// Check specific origins
+			for _, allowedOrigin := range allowedOrigins {
+				if origin == allowedOrigin {
+					allowed = true
+					c.Header("Access-Control-Allow-Origin", origin)
+					break
+				}
 			}
 		}
 		
-		if allowed {
-			c.Header("Access-Control-Allow-Origin", origin)
+		// Set CORS headers using configuration
+		c.Header("Access-Control-Allow-Methods", cfg.CORS.AllowedMethods)
+		c.Header("Access-Control-Allow-Headers", cfg.CORS.AllowedHeaders)
+		
+		// Set exposed headers if configured
+		if cfg.CORS.ExposedHeaders != "" {
+			c.Header("Access-Control-Expose-Headers", cfg.CORS.ExposedHeaders)
 		}
 		
-		// Define allowed methods
-		c.Header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		// Set credentials policy
+		c.Header("Access-Control-Allow-Credentials", cfg.CORS.AllowCredentials)
 		
-		// Define allowed headers
-		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
-		
-		// Define allowed credentials
-		c.Header("Access-Control-Allow-Credentials", "true")
-		
-		// Max age for preflight
-		c.Header("Access-Control-Max-Age", "86400")
+		// Set max age for preflight
+		c.Header("Access-Control-Max-Age", cfg.CORS.MaxAge)
 		
 		// Handle preflight requests
 		if c.Request.Method == "OPTIONS" {
