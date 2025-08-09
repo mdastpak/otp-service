@@ -64,6 +64,7 @@ func TestSecurityHeaders(t *testing.T) {
 
 	cfg := &config.Config{}
 	cfg.Server.TLS.Enabled = false
+	cfg.Security.HeadersEnabled = true
 
 	w := httptest.NewRecorder()
 	c, r := gin.CreateTestContext(w)
@@ -111,6 +112,8 @@ func TestSecurityHeadersWithTLS(t *testing.T) {
 
 	cfg := &config.Config{}
 	cfg.Server.TLS.Enabled = true
+	cfg.Security.HeadersEnabled = true
+	cfg.Security.HSTSMaxAge = "31536000"
 
 	w := httptest.NewRecorder()
 	c, r := gin.CreateTestContext(w)
@@ -180,6 +183,7 @@ func BenchmarkSecurityHeaders(b *testing.B) {
 
 	cfg := &config.Config{}
 	cfg.Server.TLS.Enabled = false
+	cfg.Security.HeadersEnabled = true
 
 	r := gin.New()
 	r.Use(SecurityHeaders(cfg))
