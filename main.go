@@ -27,10 +27,11 @@ import (
 )
 
 var (
-	logger      = logrus.New()
-	cfg         Config
-	ctx         = context.Background()
-	redisClient *redis.Client
+	logger        = logrus.New()
+	startupLogger = logrus.New()
+	cfg           Config
+	ctx           = context.Background()
+	redisClient   *redis.Client
 )
 
 // ShardConfig caches parsed shard configuration for performance
@@ -117,20 +118,20 @@ var (
 
 // loadConfig reads the configuration from the config file and environment variables
 func loadConfig() {
-	logger.Info("📋 Loading configuration...")
+	startupLogger.Info("📋 Loading configuration...")
 	
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
 
 	if err := viper.ReadInConfig(); err != nil {
-		logger.WithError(err).Fatal("Failed to read config file")
+		startupLogger.WithError(err).Fatal("Failed to read config file")
 		handleFatalError("Error reading config file", err)
 	}
-	logger.WithField("config_file", viper.ConfigFileUsed()).Info("✅ Configuration file loaded successfully")
+	startupLogger.WithField("config_file", viper.ConfigFileUsed()).Info("✅ Configuration file loaded successfully")
 	
 	viper.AutomaticEnv()
-	logger.Info("🔧 Environment variable bindings configured")
+	startupLogger.Info("🔧 Environment variable bindings configured")
 
 	// Bind environment variables to specific keys in the config
 	viper.BindEnv("redis.host", "REDIS_HOST")
@@ -293,7 +294,17 @@ func init() {
 		}
 	}
 
-	// Initialize logger with startup information
+	// Configure startup logger for beautiful human-readable output
+	startupLogger.SetFormatter(&logrus.TextFormatter{
+		DisableTimestamp:       true,
+		DisableColors:         false,
+		ForceColors:           true,
+		DisableLevelTruncation: true,
+		PadLevelText:          false,
+	})
+	startupLogger.SetLevel(logrus.InfoLevel)
+
+	// Configure operational logger for structured JSON logging
 	logger.SetFormatter(&logrus.JSONFormatter{
 		TimestampFormat: time.RFC3339,
 		FieldMap: logrus.FieldMap{
@@ -304,14 +315,14 @@ func init() {
 	})
 	logger.SetLevel(logrus.InfoLevel)
 
-	// Log service startup
-	logger.WithFields(logrus.Fields{
-		"service": "otp-service",
-		"version": "1.0.0",
-		"go_version": fmt.Sprintf("%s", os.Getenv("GO_VERSION")),
-		"pid": os.Getpid(),
-		"startup_time": time.Now().Format(time.RFC3339),
-	}).Info("🚀 OTP Service initialization started")
+	// Beautiful startup message
+	startupLogger.Info("🚀 OTP Service initialization started")
+	startupLogger.WithFields(logrus.Fields{
+		"service":    "otp-service",
+		"version":    "1.0.0",
+		"pid":        os.Getpid(),
+		"start_time": time.Now().Format("2006-01-02 15:04:05"),
+	}).Info("   System information")
 
 	// Load configuration
 	loadConfig()
@@ -1255,50 +1266,50 @@ func main() {
 	}
 	serverURL := fmt.Sprintf("%s://%s", protocol, server.Addr)
 	
-	logger.Info("==========================================")
-	logger.Info("🔐 OTP Service - Production Ready")  
-	logger.Info("==========================================")
-	logger.WithField("url", serverURL).Info("📡 Server URL: " + serverURL)
-	logger.Info("")
+	startupLogger.Info("==========================================")
+	startupLogger.Info("🔐 OTP Service - Production Ready")  
+	startupLogger.Info("==========================================")
+	startupLogger.Info("📡 Server URL: " + serverURL)
+	startupLogger.Info("")
 	
-	logger.Info("📋 Available Endpoints:")
-	logger.Info("   ├─ POST " + serverURL + "/          - Generate OTP")
-	logger.Info("   ├─ GET  " + serverURL + "/?uuid=...  - Verify OTP") 
-	logger.Info("   ├─ GET  " + serverURL + "/health     - Health Check")
-	logger.Info("   └─ GET  " + serverURL + "/metrics    - System Metrics")
-	logger.Info("")
+	startupLogger.Info("📋 Available Endpoints:")
+	startupLogger.Info("   ├─ POST " + serverURL + "/          - Generate OTP")
+	startupLogger.Info("   ├─ GET  " + serverURL + "/?uuid=...  - Verify OTP") 
+	startupLogger.Info("   ├─ GET  " + serverURL + "/health     - Health Check")
+	startupLogger.Info("   └─ GET  " + serverURL + "/metrics    - System Metrics")
+	startupLogger.Info("")
 	
-	logger.Info("⚙️  Configuration:")
-	logger.WithField("mode", cfg.Server.Mode).Info("   ├─ Server Mode: " + cfg.Server.Mode)
-	logger.WithField("redis", fmt.Sprintf("%s:%s", cfg.Redis.Host, cfg.Redis.Port)).Info("   ├─ Redis: " + fmt.Sprintf("%s:%s", cfg.Redis.Host, cfg.Redis.Port))
-	logger.WithField("indices", cfg.Redis.Indices).Info("   ├─ Redis Sharding: " + cfg.Redis.Indices)
-	logger.WithField("hash_keys", cfg.Config.HashKeys).Info(fmt.Sprintf("   ├─ Key Hashing: %t", cfg.Config.HashKeys))
+	startupLogger.Info("⚙️  Configuration:")
+	startupLogger.Info("   ├─ Server Mode: " + cfg.Server.Mode)
+	startupLogger.Info("   ├─ Redis: " + fmt.Sprintf("%s:%s", cfg.Redis.Host, cfg.Redis.Port))
+	startupLogger.Info("   ├─ Redis Sharding: " + cfg.Redis.Indices)
+	startupLogger.Info(fmt.Sprintf("   ├─ Key Hashing: %t", cfg.Config.HashKeys))
 	
 	tlsStatus := "❌ Disabled"
 	if cfg.Server.TLS.Enabled {
 		tlsStatus = "✅ Enabled"
 	}
-	logger.WithField("tls_enabled", cfg.Server.TLS.Enabled).Info("   ├─ TLS/SSL: " + tlsStatus)
-	logger.WithField("otp_config", fmt.Sprintf("Length:%d, Expiry:%s, MaxAttempts:%d, Cleanup:%s", cfg.OTP.Length, cfg.OTP.Expiry, cfg.OTP.MaxAttempts, cfg.OTP.CleanupInterval)).Info("   ├─ OTP Config: " + fmt.Sprintf("Length:%d, Expiry:%s, MaxAttempts:%d, Cleanup:%s", cfg.OTP.Length, cfg.OTP.Expiry, cfg.OTP.MaxAttempts, cfg.OTP.CleanupInterval))
+	startupLogger.Info("   ├─ TLS/SSL: " + tlsStatus)
+	startupLogger.Info("   ├─ OTP Config: " + fmt.Sprintf("Length:%d, Expiry:%s, MaxAttempts:%d, Cleanup:%s", cfg.OTP.Length, cfg.OTP.Expiry, cfg.OTP.MaxAttempts, cfg.OTP.CleanupInterval))
 	
 	corsStatus := cfg.CORS.AllowedOrigins
 	if len(corsStatus) > 50 {
 		corsStatus = corsStatus[:47] + "..."
 	}
-	logger.WithField("cors_config", corsStatus).Info("   ├─ CORS Origins: " + corsStatus)
+	startupLogger.Info("   ├─ CORS Origins: " + corsStatus)
 	
 	securityStatus := "❌ Disabled"
 	if cfg.Security.HeadersEnabled {
 		securityStatus = "✅ Enabled"
 	}
-	logger.WithField("security_headers", cfg.Security.HeadersEnabled).Info("   └─ Security Headers: " + securityStatus)
-	logger.Info("")
+	startupLogger.Info("   └─ Security Headers: " + securityStatus)
+	startupLogger.Info("")
 	
-	logger.Info("🚀 Server Starting...")
-	logger.Info("==========================================")
+	startupLogger.Info("🚀 Server Starting...")
+	startupLogger.Info("==========================================")
 	
 	if cfg.Server.TLS.Enabled {
-		logger.WithField("protocol", "HTTPS").Info("Starting HTTPS server...")
+		startupLogger.Info("🔒 Starting HTTPS server...")
 		if err := server.ListenAndServeTLS("", ""); err != http.ErrServerClosed {
 			logger.WithFields(logrus.Fields{
 				"address": server.Addr,
@@ -1307,7 +1318,7 @@ func main() {
 			handleFatalError("Failed to start server", err)
 		}
 	} else {
-		logger.WithField("protocol", "HTTP").Info("🌐 Starting HTTP server...")
+		startupLogger.Info("🌐 Starting HTTP server...")
 		if err := server.ListenAndServe(); err != http.ErrServerClosed {
 			logger.WithFields(logrus.Fields{
 				"address": server.Addr,
