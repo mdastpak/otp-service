@@ -98,7 +98,7 @@ var (
 
 // loadConfig reads the configuration from the config file and environment variables
 func loadConfig() {
-	logger.Info("Loading configuration...")
+	logger.Info("📋 Loading configuration...")
 	
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
@@ -108,10 +108,10 @@ func loadConfig() {
 		logger.WithError(err).Fatal("Failed to read config file")
 		handleFatalError("Error reading config file", err)
 	}
-	logger.WithField("config_file", viper.ConfigFileUsed()).Info("Configuration file loaded successfully")
+	logger.WithField("config_file", viper.ConfigFileUsed()).Info("✅ Configuration file loaded successfully")
 	
 	viper.AutomaticEnv()
-	logger.Info("Environment variable bindings configured")
+	logger.Info("🔧 Environment variable bindings configured")
 
 	// Bind environment variables to specific keys in the config
 	viper.BindEnv("redis.host", "REDIS_HOST")
@@ -250,7 +250,7 @@ func initRedis() {
 			}
 			return "unknown"
 		}(),
-	}).Info("Redis connection established successfully")
+	}).Info("✅ Redis connection established successfully")
 }
 
 func init() {
@@ -272,6 +272,16 @@ func init() {
 	})
 	logger.SetLevel(logrus.InfoLevel)
 
+	// Print startup banner
+	fmt.Println("\n" + strings.Repeat("=", 80))
+	fmt.Println("🚀  OTP SERVICE  🚀")
+	fmt.Println(strings.Repeat("=", 80))
+	fmt.Printf("   Version: 1.0.0\n")
+	fmt.Printf("   PID: %d\n", os.Getpid())
+	fmt.Printf("   Started: %s\n", time.Now().Format("2006-01-02 15:04:05 UTC"))
+	fmt.Printf("   Mode: %s\n", os.Getenv("ENVIRONMENT"))
+	fmt.Println(strings.Repeat("=", 80) + "\n")
+
 	// Log service startup
 	logger.WithFields(logrus.Fields{
 		"service": "otp-service",
@@ -279,7 +289,7 @@ func init() {
 		"go_version": fmt.Sprintf("%s", os.Getenv("GO_VERSION")),
 		"pid": os.Getpid(),
 		"startup_time": time.Now().Format(time.RFC3339),
-	}).Info("OTP Service initialization started")
+	}).Info("🚀 OTP Service initialization started")
 
 	// Load configuration
 	loadConfig()
@@ -1166,7 +1176,7 @@ func main() {
 		"tls_enabled": cfg.Server.TLS.Enabled,
 		"server_mode": cfg.Server.Mode,
 		"startup_complete": true,
-	}).Info("OTP Service startup completed - server ready to accept connections")
+	}).Info("✅ OTP Service startup completed - server ready to accept connections")
 	
 	if cfg.Server.TLS.Enabled {
 		logger.WithField("protocol", "HTTPS").Info("Starting HTTPS server...")
@@ -1178,7 +1188,7 @@ func main() {
 			handleFatalError("Failed to start server", err)
 		}
 	} else {
-		logger.WithField("protocol", "HTTP").Info("Starting HTTP server...")
+		logger.WithField("protocol", "HTTP").Info("🌐 Starting HTTP server...")
 		if err := server.ListenAndServe(); err != http.ErrServerClosed {
 			logger.WithFields(logrus.Fields{
 				"address": server.Addr,
